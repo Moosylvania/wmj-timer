@@ -5,7 +5,7 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
-## [Unreleased]
+## [0.2.1] - 2026-07-31
 
 ### Changed
 
