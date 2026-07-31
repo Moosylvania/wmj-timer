@@ -71,7 +71,10 @@ struct SettingsView: View {
         .onAppear {
             url = model.wmjURL
             email = model.email
-            let tokens = Keychain.tokens()
+            // Demo mode never touches the real Keychain (screenshots would show real tokens).
+            let tokens = AppModel.demo
+                ? Keychain.Tokens(company: "demo-company-api-token", user: "demo-user-api-token")
+                : Keychain.tokens()
             companyToken = tokens?.company ?? ""
             userToken = tokens?.user ?? ""
         }

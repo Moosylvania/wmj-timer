@@ -4,17 +4,18 @@
 
 1. Download the latest `Wmj-Quick-Timer-x.y.z.zip` from the [GitHub Releases page](../../../releases).
 2. Unzip it and move **WmjQuickTimer.app** into your **Applications** folder.
-3. The app is not notarized by Apple, so the **first** launch needs one extra step:
-   - **Right-click** (or Control-click) the app → **Open** → click **Open** in the dialog.
-   - If macOS still refuses, open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**; or run in Terminal:
-     ```sh
-     xattr -d com.apple.quarantine "/Applications/WmjQuickTimer.app"
-     ```
+3. Double-click to open. The app is signed and notarized by Apple, so it opens like any other app — no security warnings. (If you're upgrading from 0.1.0, which predates notarization, see [Troubleshooting](troubleshooting.md) if macOS complains.)
 4. A timer icon appears in the menu bar. There is no Dock icon — this is a menu-bar-only app.
+
+![The menu bar icon with its menu open](images/menu.png)
 
 ## First-run setup
 
-Click the timer icon and choose **Set Up Workamajig…** — a separate preferences window opens (it stays open while you copy tokens from Workamajig or a password manager). Fill in:
+Click the timer icon and choose **Set Up Workamajig…** — a separate preferences window opens (it stays open while you copy tokens from Workamajig or a password manager).
+
+![The Settings window](images/settings.png)
+
+Fill in:
 
 | Field | Where to find it |
 |---|---|
@@ -86,9 +87,9 @@ That is macOS asking your permission, not the app phoning home:
 
 - Both tokens are stored in your **macOS Keychain** (one encrypted item), never in a plain-text file and never anywhere outside your Mac.
 - The only thing that ever leaves your machine is an API request to **your company's Workamajig server**, carrying those tokens as authentication.
-- Enter your login password and click **Always Allow** to stop the prompt for that copy of the app.
+- Enter your login password and click **Always Allow** to stop the prompt for good.
 
-Because the app is distributed unsigned, every new version counts as a different app to the Keychain, so expect the prompt once again after each update. Nothing is lost — click Always Allow and carry on. If you'd rather clear it out entirely, search for `com.moosylvania.WmjQuickTimer` in **Keychain Access** to see, or delete, exactly what's stored.
+Every release is signed with the same Apple Developer ID, so the Keychain treats updates as the same app — after you click **Always Allow** once, updates won't ask again. (One exception: upgrading from 0.1.0, which was signed differently, triggers the prompt one last time.) If you'd rather clear it out entirely, search for `com.moosylvania.WmjQuickTimer` in **Keychain Access** to see, or delete, exactly what's stored.
 
 ## Start at login
 

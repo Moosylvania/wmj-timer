@@ -4,20 +4,24 @@ import WmjQuickTimerCore
 
 @Observable @MainActor
 final class AppModel {
+    /// `WMJ_DEMO=1` runs the UI on canned data for screenshots: no API calls,
+    /// no Keychain reads, no UserDefaults writes. See AGENTS.md.
+    static let demo = ProcessInfo.processInfo.environment["WMJ_DEMO"] == "1"
+
     // MARK: Settings (tokens live in the Keychain, the rest in UserDefaults)
 
     var wmjURL: String = UserDefaults.standard.string(forKey: "wmjURL") ?? "" {
-        didSet { UserDefaults.standard.set(wmjURL, forKey: "wmjURL") }
+        didSet { if !Self.demo { UserDefaults.standard.set(wmjURL, forKey: "wmjURL") } }
     }
     var email: String = UserDefaults.standard.string(forKey: "email") ?? "" {
-        didSet { UserDefaults.standard.set(email, forKey: "email") }
+        didSet { if !Self.demo { UserDefaults.standard.set(email, forKey: "email") } }
     }
     var defaultServiceCode: String = UserDefaults.standard.string(forKey: "defaultServiceCode") ?? "" {
-        didSet { UserDefaults.standard.set(defaultServiceCode, forKey: "defaultServiceCode") }
+        didSet { if !Self.demo { UserDefaults.standard.set(defaultServiceCode, forKey: "defaultServiceCode") } }
     }
     /// userID confirmed via employees/search; used instead of the raw email once known.
     var resolvedUserID: String = UserDefaults.standard.string(forKey: "resolvedUserID") ?? "" {
-        didSet { UserDefaults.standard.set(resolvedUserID, forKey: "resolvedUserID") }
+        didSet { if !Self.demo { UserDefaults.standard.set(resolvedUserID, forKey: "resolvedUserID") } }
     }
 
     /// Stored, not computed: the Keychain isn't observable, so the menu would
@@ -48,12 +52,27 @@ final class AppModel {
     // MARK: Timer
 
     var timer = TimerState() {
-        didSet { UserDefaults.standard.set(try? JSONEncoder().encode(timer), forKey: "timerState") }
+        didSet { if !Self.demo { UserDefaults.standard.set(try? JSONEncoder().encode(timer), forKey: "timerState") } }
     }
     var now = Date()
     @ObservationIgnored private var tick: Timer?
 
     init() {
+        if Self.demo {
+            wmjURL = "https://app11.workamajig.com"
+            email = "sam.taylor@acme.example"
+            defaultServiceCode = "CRTV"
+            isConfigured = true
+            // Pre-seeded running timer so screenshots show the live state
+            // (WMJ_DEMO_IDLE=1 keeps it idle for start-form screenshots).
+            if ProcessInfo.processInfo.environment["WMJ_DEMO_IDLE"] != "1" {
+                timer.start(TaskSelection(projectNumber: "ACME-1042", projectName: "Website Redesign",
+                                          taskID: "30", taskName: "Development", serviceCode: "DEV"),
+                            at: Date().addingTimeInterval(-(47 * 60 + 23)))
+            }
+            syncTick()
+            return
+        }
         isConfigured = !wmjURL.isEmpty && !email.isEmpty
             && Keychain.tokens() != nil
         if let data = UserDefaults.standard.data(forKey: "timerState"),
@@ -99,6 +118,11 @@ final class AppModel {
     // MARK: Actions
 
     func refresh() async {
+        if Self.demo {
+            services = Self.demoServices
+            projects = Self.demoProjects.sorted { $0.projectName < $1.projectName }
+            return
+        }
         guard isConfigured, !loading else { return }
         loading = true
         defer { loading = false }
@@ -114,13 +138,28 @@ final class AppModel {
         }
     }
 
+    /// Tasks for a project — the one lookup views need on demand.
+    func tasks(projectKey: String) async throws -> [WMJTask] {
+        Self.demo ? Self.demoTasks : try await api.tasks(projectKey: projectKey)
+    }
+
     /// Post time using the email as userID; on rejection, resolve the real
     /// userID via employees/search and retry once.
-    func submitTime(selection: TaskSelection, hours: Double, comments: String = "") async throws {
+    func submitTime(selection: TaskSelection, hours: Double, workDate: Date = Date(),
+                    comments: String = "") async throws {
+        if Self.demo { return }
+        // Merge-on-submit: a row already on that day for the same
+        // project/task/service gets its hours bumped instead of a duplicate
+        // row. If the lookup itself fails we fall back to posting a new row —
+        // logging time must never be blocked by the read.
+        if let existing = (try? await api.timeEntries(on: workDate))?.firstMatch(selection) {
+            try await api.updateTime(timeKey: existing.timeKey, hours: existing.actualHours + hours)
+            return
+        }
         func entry(_ userID: String) -> TimeEntry {
             TimeEntry(userID: userID, hours: hours, projectNumber: selection.projectNumber,
                       taskID: selection.taskID, serviceCode: selection.serviceCode,
-                      workDate: Date(), comments: comments)
+                      workDate: workDate, comments: comments)
         }
         let userID = resolvedUserID.isEmpty ? email.lowercased() : resolvedUserID
         do {
@@ -142,6 +181,7 @@ final class AppModel {
     /// Settings "Verify Connection": confirms tokens and captures the user's
     /// real userID and default service code.
     func verifyConnection() async throws -> Employee {
+        if Self.demo { return Self.demoEmployee }
         guard let employee = try await api.employee(email: email) else {
             throw APIError.badResponse("No employee found for \(email)")
         }
@@ -157,4 +197,31 @@ final class AppModel {
         let (h, m, s) = (seconds / 3600, seconds / 60 % 60, seconds % 60)
         return short ? String(format: "%d:%02d", h, m) : String(format: "%d:%02d:%02d", h, m, s)
     }
+}
+
+// MARK: - Demo data (WMJ_DEMO=1) — fake but realistic, safe for public screenshots
+
+extension AppModel {
+    static let demoProjects = [
+        Project(projectKey: "d1", projectNumber: "ACME-1042", projectName: "Website Redesign", clientName: "Acme Co."),
+        Project(projectKey: "d2", projectNumber: "ACME-1055", projectName: "Spring Social Campaign", clientName: "Acme Co."),
+        Project(projectKey: "d3", projectNumber: "NORTH-2201", projectName: "Brand Refresh", clientName: "Northwind Outfitters"),
+        Project(projectKey: "d4", projectNumber: "GLOBEX-3310", projectName: "Q3 Media Plan", clientName: "Globex Corporation"),
+        Project(projectKey: "d5", projectNumber: "INIT-4400", projectName: "Product Launch Video", clientName: "Initech"),
+    ]
+    static let demoTasks = [
+        WMJTask(taskKey: "t1", taskID: 10, taskName: "Discovery"),
+        WMJTask(taskKey: "t2", taskID: 20, taskName: "Design"),
+        WMJTask(taskKey: "t3", taskID: 30, taskName: "Development"),
+        WMJTask(taskKey: "t4", taskID: 40, taskName: "Client Review"),
+        WMJTask(taskKey: "t5", taskID: 50, taskName: "Project Management"),
+    ]
+    static let demoServices = [
+        Service(serviceCode: "CRTV", description: "Creative"),
+        Service(serviceCode: "DEV", description: "Development"),
+        Service(serviceCode: "STRAT", description: "Strategy"),
+        Service(serviceCode: "AM", description: "Account Management"),
+    ]
+    static let demoEmployee = Employee(userID: "sam.taylor@acme.example", email: "sam.taylor@acme.example",
+                                       defaultServiceCode: "CRTV", firstName: "Sam", lastName: "Taylor")
 }

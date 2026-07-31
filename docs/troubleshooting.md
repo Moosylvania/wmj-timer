@@ -16,7 +16,7 @@ The email in Settings must exactly match your Workamajig login email. Check for 
 
 ## macOS won't open the app ("damaged" / "unidentified developer")
 
-The app is not notarized. See [Installation](installation.md) — right-click → Open, or remove the quarantine flag:
+This shouldn't happen anymore: releases from 0.2.0 on are signed and notarized by Apple and open normally. If you see this warning, you're probably running the old unsigned 0.1.0 — download the current version from the [Releases page](../../../releases). For the legacy 0.1.0 only, the workaround was right-click → **Open**, or:
 
 ```sh
 xattr -d com.apple.quarantine "/Applications/WmjQuickTimer.app"
@@ -24,13 +24,26 @@ xattr -d com.apple.quarantine "/Applications/WmjQuickTimer.app"
 
 ## macOS keeps asking for Keychain access
 
-Your two API tokens are stored in one encrypted macOS Keychain item, so macOS asks permission the first time each *copy* of the app reads them. Since releases are unsigned, every update looks like a new app and the prompt returns once — click **Always Allow** and it stops for that version. See [About the Keychain prompt](installation.md#about-the-keychain-prompt) for what's stored and how to inspect or delete it.
+Your two API tokens are stored in one encrypted macOS Keychain item, and macOS asks permission the first time the app reads them. Click **Always Allow** and the prompt stops — releases share the same Developer ID signature, so updates don't re-trigger it. If it *keeps* coming back, you likely clicked **Allow** (one-time) instead of **Always Allow**. Upgrading from the unsigned 0.1.0 triggers the prompt one final time. See [About the Keychain prompt](installation.md#about-the-keychain-prompt) for what's stored and how to inspect or delete it.
 
 If the app instead reports missing credentials after an update, re-enter both tokens in Settings and click **Save & Verify**.
 
 ## "401 unauthorized" from Workamajig
 
-The user token identifies a specific Workamajig user, and the app can only do what that user is allowed to do. A 401 means that account lacks the security rights for the request — ask your admin to check the user's permissions, or use a token belonging to an account that has them.
+Workamajig is rejecting the credentials. Two common causes:
+
+- **The User API Token is no longer valid.** Tokens can be invalidated server-side — notably, an admin generating *system-wide* user tokens overwrites every previously issued one. Generate a fresh token (click your name → **API User Token**), paste it into Settings, and **Save & Verify**.
+- **The account lacks security rights.** The app can only do what the token's user is allowed to do — ask your admin to check the account's API access and permissions.
+
+## Seeing the full error message
+
+The Settings window and panels truncate long errors. The complete response from every failed API call is appended to:
+
+```
+~/Library/Logs/WmjQuickTimer.log
+```
+
+Open it with Console.app or any text editor (in Finder: **Go → Go to Folder…** and paste the path). Your tokens are never written to this file.
 
 ## The menu bar icon is missing
 

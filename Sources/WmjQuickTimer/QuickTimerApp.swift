@@ -13,12 +13,6 @@ struct WmjQuickTimerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var model = AppModel()
 
-    /// Bundled chess-clock glyph; nil under `swift run` (no bundle Resources).
-    private static let menuBarIcon: NSImage? = {
-        guard let icon = NSImage(named: "MenuBarIcon") else { return nil }
-        icon.isTemplate = true   // follows menu bar light/dark and highlight
-        return icon
-    }()
 
     var body: some Scene {
         MenuBarExtra {
@@ -26,18 +20,7 @@ struct WmjQuickTimerApp: App {
                 .environment(model)
         } label: {
             // Icon always shows, so a bare running clock is still identifiable.
-            Label {
-                if model.timer.isRunning {
-                    Text(model.elapsedText(short: false)).monospacedDigit()
-                }
-            } icon: {
-                if let icon = Self.menuBarIcon {
-                    Image(nsImage: icon)
-                } else {
-                    Image(systemName: "timer")
-                }
-            }
-            .labelStyle(.titleAndIcon)
+            MenuBarLabel(model: model)
         }
 
         Window("Timer", id: WindowID.timer) {
@@ -57,6 +40,48 @@ struct WmjQuickTimerApp: App {
         Settings {
             SettingsView()
                 .environment(model)
+        }
+    }
+}
+
+/// Status item label. Also the demo hook: it's the one view alive at launch,
+/// so `WMJ_DEMO_OPEN=timer|quicklog|settings` can open a window for
+/// screenshots without UI scripting.
+private struct MenuBarLabel: View {
+    let model: AppModel
+
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+
+    /// Bundled chess-clock glyph; nil under `swift run` (no bundle Resources).
+    private static let menuBarIcon: NSImage? = {
+        guard let icon = NSImage(named: "MenuBarIcon") else { return nil }
+        icon.isTemplate = true   // follows menu bar light/dark and highlight
+        return icon
+    }()
+
+    var body: some View {
+        Label {
+            if model.timer.isRunning {
+                Text(model.elapsedText(short: false)).monospacedDigit()
+            }
+        } icon: {
+            if let icon = Self.menuBarIcon {
+                Image(nsImage: icon)
+            } else {
+                Image(systemName: "timer")
+            }
+        }
+        .labelStyle(.titleAndIcon)
+        .task {
+            guard AppModel.demo else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            switch ProcessInfo.processInfo.environment["WMJ_DEMO_OPEN"] {
+            case "timer": openWindow(id: WindowID.timer)
+            case "quicklog": openWindow(id: WindowID.quickLog)
+            case "settings": openSettings()
+            default: break
+            }
         }
     }
 }

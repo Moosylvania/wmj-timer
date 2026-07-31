@@ -40,3 +40,4 @@ Packages/
 .env
 # Build output
 dist/
+secrets/

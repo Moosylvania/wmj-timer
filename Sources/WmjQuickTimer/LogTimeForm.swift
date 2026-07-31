@@ -25,6 +25,8 @@ struct ProjectField: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 4) {
                 TextField("Search projects…", text: $query)
+                    .onAppear { syncQueryToSelection() }
+                    .onChange(of: project) { syncQueryToSelection() }
                     .textFieldStyle(.roundedBorder)
                     .focused($focused)
                     .onSubmit { matches.first.map(pick) }
@@ -67,6 +69,12 @@ struct ProjectField: View {
         }
     }
 
+    /// A selection made before this view appeared (demo pre-fill) should show
+    /// in the field, not a blank placeholder.
+    private func syncQueryToSelection() {
+        if let project, query.isEmpty { query = Self.label(project) }
+    }
+
     private func pick(_ p: Project) {
         project = p
         query = Self.label(p)
@@ -82,13 +90,14 @@ struct LogTimeForm: View {
 
     let submitLabel: String
     let showsHours: Bool
-    let onSubmit: (TaskSelection, Double) async throws -> Void
+    let onSubmit: (TaskSelection, Double, Date) async throws -> Void
 
     @State private var project: Project?
     @State private var tasks: [WMJTask] = []
     @State private var task: WMJTask?
     @State private var serviceCode = ""
     @State private var hours = 1.0
+    @State private var workDate = Date()
     @State private var busy = false
     @State private var error: String?
     @State private var confirmation: String?
@@ -106,36 +115,61 @@ struct LogTimeForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ProjectField(projects: model.projects, project: $project)
-                .onChange(of: project) { loadTasks() }
-
-            Picker("Task", selection: $task) {
-                Text(project == nil ? "Select a project first" : "Select…").tag(WMJTask?.none)
-                ForEach(tasks) { t in
-                    Text(t.taskName).tag(Optional(t))
+            // Fixed-width label column, controls fill the rest.
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+                GridRow {
+                    // Top-anchored so the label stays put when the search
+                    // dropdown expands the row.
+                    Text("Project")
+                        .gridCellAnchor(.topLeading)
+                        .padding(.top, 4)
+                    ProjectField(projects: model.projects, project: $project)
+                        .onChange(of: project) { loadTasks() }
                 }
-            }
-            .disabled(tasks.isEmpty)
-
-            Picker("Service", selection: $serviceCode) {
-                Text("Select…").tag("")
-                ForEach(model.services) { s in
-                    Text(s.description).tag(s.serviceCode)
+                GridRow {
+                    Text("Task")
+                    Picker("Task", selection: $task) {
+                        Text(project == nil ? "Select a project first" : "Select…").tag(WMJTask?.none)
+                        ForEach(tasks) { t in
+                            Text(t.taskName).tag(Optional(t))
+                        }
+                    }
+                    .labelsHidden()
+                    .disabled(tasks.isEmpty)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }
-
-            if showsHours {
-                HStack {
-                    Text("Hours")
-                    TextField("Hours", value: $hours, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
-                    Stepper("", value: $hours, in: 0.25...8, step: 0.25)
-                        .labelsHidden()
-                    if !TimeMath.isValidQuickLogHours(hours) {
-                        Text("0.25–8 in ¼ steps")
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                GridRow {
+                    Text("Service")
+                    Picker("Service", selection: $serviceCode) {
+                        Text("Select…").tag("")
+                        ForEach(model.services) { s in
+                            Text(s.description).tag(s.serviceCode)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if showsHours {
+                    GridRow {
+                        Text("Hours")
+                        HStack {
+                            TextField("Hours", value: $hours, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 60)
+                            Stepper("", value: $hours, in: 0.25...8, step: 0.25)
+                                .labelsHidden()
+                            if !TimeMath.isValidQuickLogHours(hours) {
+                                Text("0.25–8 in ¼ steps")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
+                    GridRow {
+                        Text("Date")
+                        DatePicker("Date", selection: $workDate, displayedComponents: .date)
+                            .labelsHidden()
+                            .fixedSize()
                     }
                 }
             }
@@ -155,6 +189,8 @@ struct LogTimeForm: View {
         }
         .onAppear {
             if serviceCode.isEmpty { serviceCode = model.defaultServiceCode }
+            // Demo screenshots show a filled form, not an empty one.
+            if AppModel.demo, project == nil { project = model.projects.first }
         }
     }
 
@@ -164,8 +200,9 @@ struct LogTimeForm: View {
         guard let project else { return }
         Task {
             do {
-                tasks = try await model.api.tasks(projectKey: project.projectKey)
+                tasks = try await model.tasks(projectKey: project.projectKey)
                 if tasks.count == 1 { task = tasks.first }
+                if AppModel.demo, task == nil { task = tasks.first }
             } catch {
                 self.error = error.localizedDescription
             }
@@ -180,7 +217,7 @@ struct LogTimeForm: View {
         Task {
             defer { busy = false }
             do {
-                try await onSubmit(selection, hours)
+                try await onSubmit(selection, hours, workDate)
                 confirmation = "Logged ✓"
             } catch {
                 self.error = error.localizedDescription

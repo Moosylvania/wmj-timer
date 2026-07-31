@@ -55,11 +55,41 @@ public final class APIClient: Sendable {
     }
 
     public func submit(_ entry: TimeEntry) async throws {
-        let body = try JSONEncoder().encode([entry])
-        let data = try await send(path: "time", method: "POST", body: body)
+        try await sendTime(method: "POST", body: JSONEncoder().encode([entry]))
+    }
+
+    /// Entries already on the user's timesheet for one day (the UserToken
+    /// scopes the query to the current user).
+    public func timeEntries(on date: Date) async throws -> [TimesheetEntry] {
+        let day = TimeEntry.apiDateString(date)
+        let list: Envelope<TimesheetList> = try await get("time", query: [
+            .init(name: "startDate", value: day),
+            .init(name: "endDate", value: day),
+            .init(name: "includeTime", value: "1"),
+        ])
+        // A timesheet can span more than the requested day — trust each
+        // entry's own workDate ("2026-07-31T00:00:00", no timezone), compared
+        // as a plain yyyy-MM-dd prefix to avoid timezone math entirely.
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "yyyy-MM-dd"
+        let dayPrefix = fmt.string(from: date)
+        return list.data.timesheet.flatMap { $0.timeEntries ?? [] }
+            .filter { $0.workDate.hasPrefix(dayPrefix) }
+    }
+
+    /// Replaces an existing entry's hours (merge-on-submit computes the new total).
+    public func updateTime(timeKey: String, hours: Double) async throws {
+        let body = try JSONEncoder().encode([["timeKey": timeKey, "hours": String(format: "%g", hours)]])
+        try await sendTime(method: "PUT", body: body)
+    }
+
+    private func sendTime(method: String, body: Data) async throws {
+        let data = try await send(path: "time", method: method, body: body)
         // Success looks like {"success":[{...}]}; anything else is a failure worth surfacing.
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let success = json["success"] as? [Any], !success.isEmpty else {
+            Self.log("\(method) /time unexpected body\n\(String(data: data.prefix(4096), encoding: .utf8) ?? "")")
             let text = String(data: data.prefix(300), encoding: .utf8) ?? ""
             throw APIError.badResponse(text)
         }
@@ -91,6 +121,8 @@ public final class APIClient: Sendable {
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
+            let body = String(data: data.prefix(4096), encoding: .utf8) ?? ""
+            Self.log("HTTP \(status) \(method) /\(path)\n\(body)")
             let bodyError = try? JSONDecoder().decode(APIErrorBody.self, from: data)
             let description = bodyError?.description ?? String(data: data.prefix(200), encoding: .utf8) ?? ""
             if status == 403, description.localizedCaseInsensitiveContains("not enabled") {
@@ -99,5 +131,20 @@ public final class APIClient: Sendable {
             throw APIError.http(status: status, description: description)
         }
         return data
+    }
+
+    /// Full API failures land in ~/Library/Logs/WmjQuickTimer.log — the UI
+    /// truncates error bodies, this file never does. Tokens are never written.
+    public static func log(_ message: String) {
+        let url = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Logs/WmjQuickTimer.log")
+        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(line.utf8))
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 }

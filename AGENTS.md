@@ -4,7 +4,7 @@ Notes for AI agents working in this repo. Read this before changing code — mos
 
 ## What this is
 
-**Wmj Quick Timer** — a macOS menu bar (status bar) app that logs time to Workamajig. Two jobs: **Quick Log** (pick project/task/service, enter hours, post to today's timesheet) and a **Timer** (start/stop, submit rounded time). Distributed as an unsigned zip from GitHub Releases; no App Store, no Apple Developer account, no third-party dependencies.
+**Wmj Quick Timer** — a macOS menu bar (status bar) app that logs time to Workamajig. Two jobs: **Quick Log** (pick project/task/service, enter hours, post to today's timesheet) and a **Timer** (start/stop, submit rounded time). Distributed as a Developer ID-signed, notarized zip from GitHub Releases; no App Store, no third-party dependencies.
 
 ## Layout
 
@@ -26,7 +26,7 @@ Sources/WmjQuickTimer/         SwiftUI app
 Tests/WmjQuickTimerCoreTests/  XCTest over Core only
 Support/Info.plist             bundle plist (LSUIElement, CFBundleIconFile…)
 Support/Resources/             AppIcon.icns, MenuBarIcon.png/@2x — copied into the bundle
-scripts/package.sh             universal build → .app → ad-hoc sign → zip
+scripts/package.sh             universal build → .app → Developer ID sign (ad-hoc fallback) → zip; NOTARIZE=1 notarizes + staples
 scripts/release.sh             guards → package → tag → push → gh release
 scripts/smoke.sh               live API smoke test from .env
 docs/                          end-user documentation (installation/usage/troubleshooting)
@@ -40,7 +40,9 @@ Rule of thumb: **anything testable goes in Core** (no SwiftUI/AppKit imports the
 swift build                      # compile
 swift test                       # unit tests (must stay green)
 swift run                        # run from source — see caveats below
-bash scripts/package.sh 0.1.0    # build dist/WmjQuickTimer.app + zip
+bash scripts/package.sh 0.1.0    # build dist/WmjQuickTimer.app + zip (Developer ID-signed if cert present)
+NOTARIZE=1 bash scripts/package.sh 0.1.0   # …plus Apple notarization + stapling (needs .env keys)
+WMJ_DEMO=1 dist/WmjQuickTimer.app/Contents/MacOS/WmjQuickTimer   # demo mode: canned data, for screenshots
 open dist/WmjQuickTimer.app      # run the real bundle
 killall WmjQuickTimer            # stop it before repackaging
 bash scripts/smoke.sh            # live API check (needs .env)
@@ -61,7 +63,7 @@ These are the things that break if you forget them:
 - **Panel positioning.** SwiftUI has no API for "under the status item", so `StatusItemAnchor` in `Panels.swift` finds the `NSStatusBarWindow` in `NSApp.windows` and sets the frame from it, clamped to the visible screen.
 - **Menu bar icons** must be **template images** (`isTemplate = true`, black + alpha only) so macOS tints them for light/dark and inverts them on click. Provide `@1x` (18pt) and `@2x`; `NSImage(named:)` picks the scale.
 - **Icon generation** — imagemagick is installed. From an SVG: render at high density, `-trim +repage`, then `-resize`. For a colored app icon, `-fill white -colorize 100` recolors the glyph (`-evaluate set 255` silently does nothing on grayscale+alpha), composite over a rounded rect, build an `.iconset`, then `iconutil -c icns`.
-- **Keychain prompts.** macOS prompts once **per keychain item per code signature**. Both tokens live in one JSON item for that reason — don't split them back out. Every ad-hoc-signed build is a new identity, so a prompt after each rebuild is expected, not a bug.
+- **Keychain prompts.** macOS prompts once **per keychain item per code signature**. Both tokens live in one JSON item for that reason — don't split them back out. Released builds share the stable Developer ID signature, so users see the prompt once ever; ad-hoc fallback builds (no cert on the machine) are each a new identity, so a prompt after every such rebuild is expected, not a bug.
 - **Dock icon caching** — macOS may show a stale app icon until the bundle is moved or you log out.
 
 ## SwiftUI/Swift conventions here
@@ -73,6 +75,7 @@ These are the things that break if you forget them:
 - Persistence: non-secrets and the encoded `TimerState` in `UserDefaults` (via `didSet`), tokens in the Keychain. Nothing else.
 - No third-party dependencies. URLSession, Security, ServiceManagement, SwiftUI, AppKit only. Don't add a package for something a few lines can do.
 - Deliberate shortcuts are marked with a `// ponytail:` comment naming the ceiling. Follow that convention instead of silently taking a shortcut.
+- **Demo mode**: `WMJ_DEMO=1` (checked via `AppModel.demo`) runs the whole UI on canned fake data — no API calls, no Keychain reads, no UserDefaults writes. Use it for screenshots or UI poking without real credentials; keep any new API/Keychain/persistence touchpoint behind the same flag. `WMJ_DEMO_OPEN=timer|quicklog|settings` opens that window at launch (screenshots need no UI scripting); `WMJ_DEMO_IDLE=1` skips the pre-seeded running timer so the start-form shows.
 
 ## Workamajig API facts
 
@@ -85,6 +88,8 @@ Base `{wmjURL}/api/beta1`, headers `APIAccessToken` (company) + `UserToken` (use
 | `GET /services` | PascalCase (`ServiceCode`, `Description`) |
 | `GET /employees/search?email=` | camelCase; `userID` **is the lowercased email**, `systemID` is empty in our instance |
 | `POST /time` | Body is a JSON **array** of entries; success is `{"success":[…]}`; `workDate` is `M/d/yyyy` with `en_US_POSIX` |
+| `GET /time?startDate=&endDate=&includeTime=1` | Timesheets (UserToken-scoped) with `TimeEntries` inside; entry `taskID` is a **string** here and `serviceCode` comes back lowercased |
+| `PUT /time` | Update an entry: array body `[{"timeKey":…,"hours":…}]` suffices; same success envelope. Used by merge-on-submit (`AppModel.submitTime`) |
 
 Field casing is inconsistent per module — every model spells out `CodingKeys`. Verify against `scripts/smoke.sh` output before trusting a new model.
 
@@ -94,7 +99,7 @@ Time posting: try the lowercased email as `userID`, and on failure look up the e
 
 ## Security
 
-- **`.env` is gitignored and must never be committed, echoed, or pasted into a message.** It holds real `WMJ_COMPANY_TOKEN` / `WMJ_USER_TOKEN` / `WMJ_URL` / `WMJ_EMAIL`.
+- **`.env` is gitignored and must never be committed, echoed, or pasted into a message.** It holds real `WMJ_COMPANY_TOKEN` / `WMJ_USER_TOKEN` / `WMJ_URL` / `WMJ_EMAIL`, plus notarization credentials: `APPSTORECONNECT_APIKEY` (path to the App Store Connect `.p8`, kept in the gitignored `secrets/`) and `APPSTORECONNECT_ISSUERID`. The `.p8` is downloadable from Apple only once — don't delete or move it.
 - Tokens belong in the Keychain, never in `UserDefaults`, logs, or source.
 - Don't POST time to the live timesheet as a casual test — a real entry lands on a real person's timesheet. `scripts/smoke.sh` has a commented block for a deliberate one.
 

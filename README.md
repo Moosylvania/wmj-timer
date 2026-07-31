@@ -2,6 +2,8 @@
 
 A macOS menu bar app for logging time to [Workamajig](https://www.workamajig.com): quick-log hours against a project/task, or run a live timer that submits quarter-hour-rounded time to your timesheet.
 
+![The menu bar icon with its menu open](docs/images/menu.png)
+
 **User documentation:** [Installation](docs/installation.md) · [Usage](docs/usage.md) · [Troubleshooting](docs/troubleshooting.md) · [Changelog](CHANGELOG.md)
 
 ## Requirements
@@ -39,7 +41,17 @@ Hits `/services`, `/projects`, and `/employees/search` and prints pass/fail. A c
 
 ## Release
 
-One-time setup: `brew install gh && gh auth login`.
+Releases are Developer ID-signed and notarized by Apple; `release.sh` refuses to run until the pieces below are in place.
+
+One-time setup:
+
+1. `brew install gh && gh auth login`
+2. A **Developer ID Application** certificate in your login Keychain (Xcode → Settings → Accounts → your team → Manage Certificates → **+** → Developer ID Application — Account Holder role required). Verify with `security find-identity -v -p codesigning`.
+3. An **App Store Connect API key** for notarization (App Store Connect → Users and Access → Integrations → Team Keys; the `.p8` downloads only once — keep it in the gitignored `secrets/`). In `.env`, set:
+   ```sh
+   APPSTORECONNECT_APIKEY=./secrets/AuthKey_XXXXXXXXXX.p8
+   APPSTORECONNECT_ISSUERID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+   ```
 
 Every change goes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) as you make it. To ship:
 
@@ -47,7 +59,7 @@ Every change goes under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) as you
 2. Commit it (`git commit -am "Release X.Y.Z"`).
 3. `bash scripts/release.sh X.Y.Z`
 
-That verifies you're on a clean `main` with a real changelog entry, builds the universal (Apple silicon + Intel) zip via `scripts/package.sh`, tags `vX.Y.Z`, pushes, and creates the GitHub Release with `dist/Wmj-Quick-Timer-X.Y.Z.zip` attached and the changelog section as the notes. It aborts before tagging if any check fails.
+That verifies you're on a clean `main` with a real changelog entry and the signing/notarization pieces in place, builds the universal (Apple silicon + Intel) zip via `scripts/package.sh` — signed, notarized, and stapled — tags `vX.Y.Z`, pushes, and creates the GitHub Release with `dist/Wmj-Quick-Timer-X.Y.Z.zip` attached and the changelog section as the notes. It aborts before tagging if any check fails.
 
 Versioning:
 
@@ -57,6 +69,6 @@ Versioning:
 | **Minor** (0.**2**.0) | New features or UI changes |
 | **Major** (**1**.0.0) | Anything forcing users to reconfigure — settings reset, tokens re-entered, macOS requirement raised |
 
-The app is **not** notarized (no Apple Developer account required) — first-launch steps for users are in [docs/installation.md](docs/installation.md). Every release is a new ad-hoc signature, so users get one Keychain prompt after updating; mention that in the notes when it matters.
+To build a zip without releasing it (testing the bundle locally): `bash scripts/package.sh X.Y.Z` — signs with the Developer ID cert if present (ad-hoc fallback otherwise) and skips notarization; add `NOTARIZE=1` to test the full notarization path.
 
-To build a zip without releasing it (testing the bundle locally): `bash scripts/package.sh X.Y.Z`.
+For documentation screenshots, run the app with fake data — no credentials or API calls involved: `WMJ_DEMO=1 dist/WmjQuickTimer.app/Contents/MacOS/WmjQuickTimer`.

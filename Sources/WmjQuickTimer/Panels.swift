@@ -18,7 +18,7 @@ struct TimerPanel: View {
             switch model.timer.phase {
             case .idle:
                 Text("Start a Timer").font(.headline)
-                LogTimeForm(submitLabel: "Start", showsHours: false) { selection, _ in
+                LogTimeForm(submitLabel: "Start", showsHours: false) { selection, _, _ in
                     model.startTimer(selection)
                     dismiss()
                 }
@@ -90,8 +90,8 @@ struct QuickLogPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quick Log").font(.headline)
-            LogTimeForm(submitLabel: "Log Time", showsHours: true) { selection, hours in
-                try await model.submitTime(selection: selection, hours: hours)
+            LogTimeForm(submitLabel: "Log Time", showsHours: true) { selection, hours, date in
+                try await model.submitTime(selection: selection, hours: hours, workDate: date)
             }
             if let message = model.loadError {
                 Text(message).font(.caption).foregroundStyle(.red)

@@ -5,11 +5,25 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
-## [Unreleased]
+## [0.2.0] - 2026-07-31
 
 ### Added
 
+- Date field on Quick Log, defaulting to today — log time to a different day when needed.
+- Merge-on-submit: if the day already has a row for the same project, task, and service, submitted hours are added to that row instead of creating a duplicate. Existing time is never overwritten.
+- Failed API calls are logged in full to `~/Library/Logs/WmjQuickTimer.log` (the UI truncates long errors; tokens are never written).
 - `AGENTS.md` — repo guide for AI agents: layout, commands, macOS menu bar gotchas, API facts, and the release flow.
+- Demo mode (`WMJ_DEMO=1`): runs the UI on canned fake data with no API calls, Keychain reads, or settings writes — used for documentation screenshots.
+- Screenshots in the user documentation (menu, Timer, Quick Log, Settings).
+
+### Changed
+
+- Quick Log and Start a Timer forms now use an aligned label column with uniform control widths.
+- Releases are now signed with a Developer ID certificate and notarized by Apple: no more right-click-to-open or `xattr` on first launch, and the Keychain permission prompt happens once ever instead of after every update. Upgrading from 0.1.0 triggers the prompt one last time.
+
+### Fixed
+
+- Reopening a panel with a project already selected now shows the project in the search field instead of a blank placeholder.
 
 ## [0.1.0] - 2026-07-31
 
@@ -28,5 +42,5 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 - Universal (Apple silicon + Intel) unsigned zip distribution via `scripts/package.sh`.
 - User documentation: [installation](docs/installation.md) (including how to get API tokens and why macOS asks for Keychain access), [usage](docs/usage.md), [troubleshooting](docs/troubleshooting.md).
 
-[Unreleased]: https://github.com/Moosylvania/wmj-timer/compare/v0.1.0...HEAD
+[0.2.0]: https://github.com/Moosylvania/wmj-timer/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Moosylvania/wmj-timer/releases/tag/v0.1.0

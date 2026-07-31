@@ -11,6 +11,13 @@ public struct Project: Codable, Identifiable, Hashable, Sendable {
 
     public var id: String { projectKey }
 
+    public init(projectKey: String, projectNumber: String, projectName: String, clientName: String) {
+        self.projectKey = projectKey
+        self.projectNumber = projectNumber
+        self.projectName = projectName
+        self.clientName = clientName
+    }
+
     enum CodingKeys: String, CodingKey {
         case projectKey = "ProjectKey"
         case projectNumber = "ProjectNumber"
@@ -29,6 +36,13 @@ public struct WMJTask: Codable, Identifiable, Hashable, Sendable {
     /// POST /time wants the integer task ID as a string ("1"), not 1.0.
     public var taskIDString: String { String(Int(taskID)) }
 
+    public init(taskKey: String, taskID: Double, taskName: String, taskStatus: Double? = nil) {
+        self.taskKey = taskKey
+        self.taskID = taskID
+        self.taskName = taskName
+        self.taskStatus = taskStatus
+    }
+
     enum CodingKeys: String, CodingKey {
         case taskKey, taskID, taskName, taskStatus
     }
@@ -39,6 +53,11 @@ public struct Service: Codable, Identifiable, Hashable, Sendable {
     public var description: String
 
     public var id: String { serviceCode }
+
+    public init(serviceCode: String, description: String) {
+        self.serviceCode = serviceCode
+        self.description = description
+    }
 
     enum CodingKeys: String, CodingKey {
         case serviceCode = "ServiceCode"
@@ -52,6 +71,15 @@ public struct Employee: Codable, Sendable {
     public var defaultServiceCode: String
     public var firstName: String
     public var lastName: String
+
+    public init(userID: String, email: String, defaultServiceCode: String,
+                firstName: String, lastName: String) {
+        self.userID = userID
+        self.email = email
+        self.defaultServiceCode = defaultServiceCode
+        self.firstName = firstName
+        self.lastName = lastName
+    }
 
     enum CodingKeys: String, CodingKey {
         case userID, email, defaultServiceCode, firstName, lastName
@@ -75,11 +103,54 @@ public struct TimeEntry: Codable, Sendable {
         self.projectNumber = projectNumber
         self.taskID = taskID
         self.serviceCode = serviceCode
+        self.workDate = Self.apiDateString(workDate)
+        self.comments = comments
+    }
+
+    /// The M/d/yyyy (en_US_POSIX) form the time endpoints expect.
+    public static func apiDateString(_ date: Date) -> String {
         let fmt = DateFormatter()
         fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.dateFormat = "M/d/yyyy"
-        self.workDate = fmt.string(from: workDate)
-        self.comments = comments
+        return fmt.string(from: date)
+    }
+}
+
+/// A row already on the timesheet (from `GET /time?includeTime=1`) — what
+/// merge-on-submit matches against. camelCase like the tasks module, but
+/// `taskID` is a string here, not a Double.
+public struct TimesheetEntry: Codable, Sendable {
+    public var timeKey: String
+    public var actualHours: Double
+    public var projectNumber: String
+    public var taskID: String
+    public var serviceCode: String
+    public var workDate: String   // "2026-07-31T00:00:00"
+
+    public init(timeKey: String, actualHours: Double, projectNumber: String,
+                taskID: String, serviceCode: String, workDate: String) {
+        self.timeKey = timeKey
+        self.actualHours = actualHours
+        self.projectNumber = projectNumber
+        self.taskID = taskID
+        self.serviceCode = serviceCode
+        self.workDate = workDate
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case timeKey, actualHours, projectNumber, taskID, serviceCode, workDate
+    }
+}
+
+public extension [TimesheetEntry] {
+    /// The row a submission should merge into: same project, task, and
+    /// service (Workamajig lowercases service codes on the timesheet).
+    func firstMatch(_ selection: TaskSelection) -> TimesheetEntry? {
+        first {
+            $0.projectNumber == selection.projectNumber
+                && $0.taskID == selection.taskID
+                && $0.serviceCode.caseInsensitiveCompare(selection.serviceCode) == .orderedSame
+        }
     }
 }
 
@@ -90,6 +161,13 @@ struct Envelope<Payload: Decodable>: Decodable {
 }
 
 struct ProjectList: Decodable { var project: [Project] }
+struct TimesheetList: Decodable {
+    struct Timesheet: Decodable {
+        var timeEntries: [TimesheetEntry]?
+        enum CodingKeys: String, CodingKey { case timeEntries = "TimeEntries" }
+    }
+    var timesheet: [Timesheet]
+}
 struct TaskList: Decodable { var task: [WMJTask] }
 struct ServiceList: Decodable { var service: [Service] }
 struct EmployeeList: Decodable { var employee: [Employee] }
