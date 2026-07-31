@@ -1,0 +1,24 @@
+{
+	"configurations": [
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:wmj-timer}",
+			"name": "Debug WmjQuickTimer",
+			"target": "WmjQuickTimer",
+			"configuration": "debug",
+			"preLaunchTask": "swift: Build Debug WmjQuickTimer"
+		},
+		{
+			"type": "swift",
+			"request": "launch",
+			"args": [],
+			"cwd": "${workspaceFolder:wmj-timer}",
+			"name": "Release WmjQuickTimer",
+			"target": "WmjQuickTimer",
+			"configuration": "release",
+			"preLaunchTask": "swift: Build Release WmjQuickTimer"
+		}
+	]
+}
