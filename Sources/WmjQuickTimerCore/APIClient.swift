@@ -47,13 +47,6 @@ public final class APIClient: Sendable {
         return list.data.service.sorted { $0.description < $1.description }
     }
 
-    public func employee(email: String) async throws -> Employee? {
-        let list: Envelope<EmployeeList> = try await get("employees/search", query: [
-            .init(name: "email", value: email),
-        ])
-        return list.data.employee.first
-    }
-
     public func submit(_ entry: TimeEntry) async throws {
         try await sendTime(method: "POST", body: JSONEncoder().encode([entry]))
     }

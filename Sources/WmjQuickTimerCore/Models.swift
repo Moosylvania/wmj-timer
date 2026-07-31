@@ -65,27 +65,6 @@ public struct Service: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
-public struct Employee: Codable, Sendable {
-    public var userID: String
-    public var email: String
-    public var defaultServiceCode: String
-    public var firstName: String
-    public var lastName: String
-
-    public init(userID: String, email: String, defaultServiceCode: String,
-                firstName: String, lastName: String) {
-        self.userID = userID
-        self.email = email
-        self.defaultServiceCode = defaultServiceCode
-        self.firstName = firstName
-        self.lastName = lastName
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case userID, email, defaultServiceCode, firstName, lastName
-    }
-}
-
 public struct TimeEntry: Codable, Sendable {
     public var userID: String
     public var hours: String
@@ -170,7 +149,6 @@ struct TimesheetList: Decodable {
 }
 struct TaskList: Decodable { var task: [WMJTask] }
 struct ServiceList: Decodable { var service: [Service] }
-struct EmployeeList: Decodable { var employee: [Employee] }
 
 struct APIErrorBody: Decodable {
     var status: Int?

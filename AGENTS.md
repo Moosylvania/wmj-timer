@@ -12,7 +12,7 @@ Notes for AI agents working in this repo. Read this before changing code — mos
 Package.swift                  SPM manifest — no .xcodeproj exists, don't add one
 Sources/WmjQuickTimerCore/     Testable library: no SwiftUI, no AppKit
   Models.swift                 Codable models, API envelopes, APIError
-  APIClient.swift              async URLSession client, auth headers, 5 endpoints
+  APIClient.swift              async URLSession client, auth headers, 6 endpoints
   Keychain.swift               SecItem wrapper — both tokens in ONE item
   TimeMath.swift               quarter-hour rounding + Quick Log validation
   TimerState.swift             pure timer state machine (idle/running/stopped)
@@ -86,7 +86,6 @@ Base `{wmjURL}/api/beta1`, headers `APIAccessToken` (company) + `UserToken` (use
 | `GET /projects` | **PascalCase** JSON (`ProjectKey`, `ProjectNumber`, `ProjectName`, `ClientName`) |
 | `GET /tasks?projectKey=&includeTaskUser=true` | **camelCase**; `taskID` is a `Double` — post it as an integer string |
 | `GET /services` | PascalCase (`ServiceCode`, `Description`) |
-| `GET /employees/search?email=` | camelCase; `userID` **is the lowercased email**, `systemID` is empty in our instance |
 | `POST /time` | Body is a JSON **array** of entries; success is `{"success":[…]}`; `workDate` is `M/d/yyyy` with `en_US_POSIX` |
 | `GET /time?startDate=&endDate=&includeTime=1` | Timesheets (UserToken-scoped) with `TimeEntries` inside; entry `taskID` is a **string** here and `serviceCode` comes back lowercased |
 | `PUT /time` | Update an entry: array body `[{"timeKey":…,"hours":…}]` suffices; same success envelope. Used by merge-on-submit (`AppModel.submitTime`) |
@@ -95,7 +94,7 @@ Field casing is inconsistent per module — every model spells out `CodingKeys`.
 
 Two error cases users hit: `403` with "not enabled" (admin must enable API access — mapped to `APIError.accessNotEnabled`), and `401` (the token's user lacks the security rights).
 
-Time posting: try the lowercased email as `userID`, and on failure look up the employee and retry once, caching the resolved ID (`AppModel.submitTime`).
+Time posting: `userID` is always the lowercased settings email (`AppModel.submitTime`). Don't reach for `GET /employees/search` — it needs permissions many users lack, which is why it was removed.
 
 ## Security
 

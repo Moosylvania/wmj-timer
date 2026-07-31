@@ -4,15 +4,11 @@
 
 Workamajig blocks API calls per-user until an admin enables access. Ask your admin to enable API access for your account in Workamajig's admin settings, then generate/retrieve your User API Token (click your name → API User Token) and re-verify in the app's Settings. This is separate from simply *having* a token — the token can exist while access is still disabled.
 
-## "No employee found for [email]"
-
-The email in Settings must exactly match your Workamajig login email. Check for typos and confirm with your admin which email is on your employee record.
-
 ## Time entry submit fails
 
+- The email in Settings must exactly match your Workamajig login email — it's used as your user ID when posting time. Check for typos and confirm with your admin which email is on your employee record.
 - Some Workamajig setups require a **Service code** on every entry — make sure one is selected.
 - The task must allow time to be charged to it (and to you). Try the same entry in the Workamajig web UI; if it fails there too, it's a project setup issue.
-- The app first tries your email address as your user ID, then automatically retries with the user ID from your employee record. If both fail, the error shown comes straight from Workamajig.
 
 ## macOS won't open the app ("damaged" / "unidentified developer")
 

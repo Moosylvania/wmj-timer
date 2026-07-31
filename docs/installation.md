@@ -26,7 +26,7 @@ Fill in:
 
 The eye button next to each token field reveals what you pasted, so you can check it against Workamajig before saving.
 
-Click **Save & Verify** — you should see "Connected as *Your Name*". If you get an "API access is not enabled" error, see [Troubleshooting](troubleshooting.md).
+Click **Save & Verify** — you should see "Connected". If you get an "API access is not enabled" error, see [Troubleshooting](troubleshooting.md).
 
 ## Getting your API tokens
 

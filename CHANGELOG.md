@@ -5,6 +5,13 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
+## [Unreleased]
+
+### Changed
+
+- Time is always posted with your lowercased email as the user ID — the app no longer calls `/employees/search`, which not every user has permission for. Save & Verify now checks the connection with a services lookup instead of an employee search.
+- The Workamajig URL is accepted with or without a trailing slash (e.g. `https://app11.workamajig.com/`).
+
 ## [0.2.0] - 2026-07-31
 
 ### Added

@@ -19,17 +19,15 @@ final class AppModel {
     var defaultServiceCode: String = UserDefaults.standard.string(forKey: "defaultServiceCode") ?? "" {
         didSet { if !Self.demo { UserDefaults.standard.set(defaultServiceCode, forKey: "defaultServiceCode") } }
     }
-    /// userID confirmed via employees/search; used instead of the raw email once known.
-    var resolvedUserID: String = UserDefaults.standard.string(forKey: "resolvedUserID") ?? "" {
-        didSet { if !Self.demo { UserDefaults.standard.set(resolvedUserID, forKey: "resolvedUserID") } }
-    }
-
     /// Stored, not computed: the Keychain isn't observable, so the menu would
     /// never notice tokens being saved.
     private(set) var isConfigured = false
 
     /// Single write path for credentials, so `isConfigured` can't go stale.
     func saveCredentials(url: String, email: String, companyToken: String, userToken: String) {
+        // Accept the URL with or without a trailing slash — store it without.
+        var url = url.trimmingCharacters(in: .whitespaces)
+        while url.hasSuffix("/") { url.removeLast() }
         wmjURL = url
         self.email = email
         Keychain.save(Keychain.Tokens(company: companyToken, user: userToken))
@@ -143,8 +141,8 @@ final class AppModel {
         Self.demo ? Self.demoTasks : try await api.tasks(projectKey: projectKey)
     }
 
-    /// Post time using the email as userID; on rejection, resolve the real
-    /// userID via employees/search and retry once.
+    /// Post time using the lowercased email as userID — Workamajig accepts it
+    /// directly, and employees/search needs permissions not everyone has.
     func submitTime(selection: TaskSelection, hours: Double, workDate: Date = Date(),
                     comments: String = "") async throws {
         if Self.demo { return }
@@ -156,20 +154,10 @@ final class AppModel {
             try await api.updateTime(timeKey: existing.timeKey, hours: existing.actualHours + hours)
             return
         }
-        func entry(_ userID: String) -> TimeEntry {
-            TimeEntry(userID: userID, hours: hours, projectNumber: selection.projectNumber,
-                      taskID: selection.taskID, serviceCode: selection.serviceCode,
-                      workDate: workDate, comments: comments)
-        }
-        let userID = resolvedUserID.isEmpty ? email.lowercased() : resolvedUserID
-        do {
-            try await api.submit(entry(userID))
-        } catch {
-            guard let employee = try? await api.employee(email: email),
-                  employee.userID != userID else { throw error }
-            try await api.submit(entry(employee.userID))
-            resolvedUserID = employee.userID
-        }
+        try await api.submit(TimeEntry(userID: email.lowercased(), hours: hours,
+                                       projectNumber: selection.projectNumber,
+                                       taskID: selection.taskID, serviceCode: selection.serviceCode,
+                                       workDate: workDate, comments: comments))
     }
 
     func submitTimer() async throws {
@@ -178,16 +166,12 @@ final class AppModel {
         discardTimer()
     }
 
-    /// Settings "Verify Connection": confirms tokens and captures the user's
-    /// real userID and default service code.
-    func verifyConnection() async throws -> Employee {
-        if Self.demo { return Self.demoEmployee }
-        guard let employee = try await api.employee(email: email) else {
-            throw APIError.badResponse("No employee found for \(email)")
-        }
-        resolvedUserID = employee.userID
-        if defaultServiceCode.isEmpty { defaultServiceCode = employee.defaultServiceCode }
-        return employee
+    /// Settings "Save & Verify": confirms the URL and tokens with a
+    /// lightweight authenticated call (no employees/search — not every user
+    /// has permission for it).
+    func verifyConnection() async throws {
+        if Self.demo { return }
+        _ = try await api.services()
     }
 
     // MARK: Formatting
@@ -222,6 +206,4 @@ extension AppModel {
         Service(serviceCode: "STRAT", description: "Strategy"),
         Service(serviceCode: "AM", description: "Account Management"),
     ]
-    static let demoEmployee = Employee(userID: "sam.taylor@acme.example", email: "sam.taylor@acme.example",
-                                       defaultServiceCode: "CRTV", firstName: "Sam", lastName: "Taylor")
 }

@@ -108,8 +108,8 @@ struct SettingsView: View {
         Task {
             defer { verifying = false }
             do {
-                let employee = try await model.verifyConnection()
-                status = ("Connected as \(employee.firstName) \(employee.lastName)", false)
+                try await model.verifyConnection()
+                status = ("Connected", false)
             } catch {
                 status = (error.localizedDescription, true)
             }
