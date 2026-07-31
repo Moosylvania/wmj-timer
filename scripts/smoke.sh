@@ -27,7 +27,6 @@ call() {
 
 call "services"          "services"
 call "projects"          "projects"
-call "employee lookup"   "employees/search?email=${WMJ_EMAIL:?Add WMJ_EMAIL=you@yourcompany.com to .env}"
 
 # First live time entry — run deliberately, then verify it appears on your
 # timesheet in Workamajig before trusting the app's submit path:

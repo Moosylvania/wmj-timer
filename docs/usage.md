@@ -27,12 +27,12 @@ Submitting **adds to your day, never overwrites it**: if that day already has a 
 
 ## Timer
 
-![The Timer window while running](images/timer.png)
-
 1. Click **Add Timer**, pick Project / Task / Service, click **Start** — the window closes itself.
 
-   ![The Start a Timer form](images/timer-start.png)
+	![The Start a Timer form](images/timer-start.png)
 2. The menu bar icon switches to a live **⏱ h:mm** counter. Reopen **Timer** any time to see the full `h:mm:ss` elapsed time.
+
+	![The Timer window while running](images/timer.png)
 3. Click **Stop** when you're done (or pausing). You then have three choices:
    - **Resume** — keep the timer going from where it stopped.
    - **Submit Time** — logs the elapsed time to today's timesheet, **rounded up to the next quarter hour** (minimum 0.25 — 16 minutes logs 0.5). If today already has a row for that project/task/service the hours are **added to its total**; otherwise a new row is created — existing time is never overwritten. The panel shows the exact hours that will be logged before you click.

@@ -37,7 +37,7 @@ With a `.env` file in the repo root (never committed) containing `WMJ_URL`, `WMJ
 bash scripts/smoke.sh
 ```
 
-Hits `/services`, `/projects`, and `/employees/search` and prints pass/fail. A commented block at the bottom shows how to post a first live time entry deliberately.
+Hits `/services`, `/projects` and prints pass/fail. A commented block at the bottom shows how to post a first live time entry deliberately.
 
 ## Release
 
