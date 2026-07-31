@@ -44,7 +44,7 @@ Which set of steps applies depends on whether your agency runs Workamajig **Plat
 4. Click **System Setup**
 5. Click **Connections**
 6. Click **API**
-7. Click **Generate New Company Token**
+7. Click **Generate New Company Token** - only do this if a token does not already exist
 
 > The same screen has a button to generate system-wide user tokens. Avoid it: generating them overwrites every previously issued user token. Workamajig recommends creating user tokens individually as employees are added.
 
