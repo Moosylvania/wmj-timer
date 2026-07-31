@@ -1,4 +1,4 @@
-# Wmj Quick Timer
+# WMJ Quick Timer
 
 A macOS menu bar app for logging time to [Workamajig](https://www.workamajig.com): quick-log hours against a project/task, or run a live timer that submits quarter-hour-rounded time to your timesheet.
 
