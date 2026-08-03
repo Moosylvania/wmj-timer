@@ -194,11 +194,11 @@ extension AppModel {
         Project(projectKey: "d5", projectNumber: "INIT-4400", projectName: "Product Launch Video", clientName: "Initech"),
     ]
     static let demoTasks = [
-        WMJTask(taskKey: "t1", taskID: 10, taskName: "Discovery"),
-        WMJTask(taskKey: "t2", taskID: 20, taskName: "Design"),
-        WMJTask(taskKey: "t3", taskID: 30, taskName: "Development"),
-        WMJTask(taskKey: "t4", taskID: 40, taskName: "Client Review"),
-        WMJTask(taskKey: "t5", taskID: 50, taskName: "Project Management"),
+        WMJTask(taskKey: "t1", taskID: "10", taskName: "Discovery"),
+        WMJTask(taskKey: "t2", taskID: "20", taskName: "Design"),
+        WMJTask(taskKey: "t3", taskID: "30", taskName: "Development"),
+        WMJTask(taskKey: "t4", taskID: "40", taskName: "Client Review"),
+        WMJTask(taskKey: "t5", taskID: "50", taskName: "Project Management"),
     ]
     static let demoServices = [
         Service(serviceCode: "CRTV", description: "Creative"),

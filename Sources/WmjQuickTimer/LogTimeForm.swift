@@ -105,7 +105,7 @@ struct LogTimeForm: View {
     private var selection: TaskSelection? {
         guard let project, let task, !serviceCode.isEmpty else { return nil }
         return TaskSelection(projectNumber: project.projectNumber, projectName: project.projectName,
-                             taskID: task.taskIDString, taskName: task.taskName,
+                             taskID: task.taskID, taskName: task.taskName,
                              serviceCode: serviceCode)
     }
 
@@ -188,6 +188,9 @@ struct LogTimeForm: View {
             }
         }
         .onAppear {
+            // @State keeps the last draft across window opens — the date must
+            // not go stale with it.
+            workDate = Date()
             if serviceCode.isEmpty { serviceCode = model.defaultServiceCode }
             // Demo screenshots show a filled form, not an empty one.
             if AppModel.demo, project == nil { project = model.projects.first }

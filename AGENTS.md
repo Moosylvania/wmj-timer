@@ -84,7 +84,7 @@ Base `{wmjURL}/api/beta1`, headers `APIAccessToken` (company) + `UserToken` (use
 | Endpoint | Notes |
 |---|---|
 | `GET /projects` | **PascalCase** JSON (`ProjectKey`, `ProjectNumber`, `ProjectName`, `ClientName`) |
-| `GET /tasks?projectKey=&includeTaskUser=true` | **camelCase**; `taskID` is a `Double` — post it as an integer string |
+| `GET /tasks?projectKey=&includeTaskUser=true` | **camelCase**; `taskID` is usually a number but can be any string ("2.1.1" on outline-numbered jobs) — decoded to and posted as a string |
 | `GET /services` | PascalCase (`ServiceCode`, `Description`) |
 | `POST /time` | Body is a JSON **array** of entries; success is `{"success":[…]}`; `workDate` is `M/d/yyyy` with `en_US_POSIX` |
 | `GET /time?startDate=&endDate=&includeTime=1` | Timesheets (UserToken-scoped) with `TimeEntries` inside; entry `taskID` is a **string** here and `serviceCode` comes back lowercased |

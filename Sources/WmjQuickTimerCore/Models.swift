@@ -28,15 +28,15 @@ public struct Project: Codable, Identifiable, Hashable, Sendable {
 
 public struct WMJTask: Codable, Identifiable, Hashable, Sendable {
     public var taskKey: String
-    public var taskID: Double
+    /// Stored as a string: the API returns a number for most projects but
+    /// strings like "2.1.1" for some, and POST /time takes it as a string anyway.
+    public var taskID: String
     public var taskName: String
     public var taskStatus: Double?
 
     public var id: String { taskKey }
-    /// POST /time wants the integer task ID as a string ("1"), not 1.0.
-    public var taskIDString: String { String(Int(taskID)) }
 
-    public init(taskKey: String, taskID: Double, taskName: String, taskStatus: Double? = nil) {
+    public init(taskKey: String, taskID: String, taskName: String, taskStatus: Double? = nil) {
         self.taskKey = taskKey
         self.taskID = taskID
         self.taskName = taskName
@@ -45,6 +45,20 @@ public struct WMJTask: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case taskKey, taskID, taskName, taskStatus
+    }
+
+    /// Accept `taskID` as a number (42 → "42") or any string ("2.1.1").
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        taskKey = try c.decode(String.self, forKey: .taskKey)
+        taskName = try c.decode(String.self, forKey: .taskName)
+        taskStatus = try? c.decode(Double.self, forKey: .taskStatus)
+        if let string = try? c.decode(String.self, forKey: .taskID) {
+            taskID = string
+        } else {
+            let number = try c.decode(Double.self, forKey: .taskID)
+            taskID = number == number.rounded() ? String(Int(number)) : String(number)
+        }
     }
 }
 
