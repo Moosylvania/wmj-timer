@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 import WmjQuickTimerCore
 
 @Observable @MainActor
@@ -7,6 +8,10 @@ final class AppModel {
     /// `WMJ_DEMO=1` runs the UI on canned data for screenshots: no API calls,
     /// no Keychain reads, no UserDefaults writes. See AGENTS.md.
     static let demo = ProcessInfo.processInfo.environment["WMJ_DEMO"] == "1"
+
+    /// Only the packaged .app has a version — `swift run` gets the sentinel,
+    /// which suppresses update checks entirely (see `checkForUpdate`).
+    static let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
 
     // MARK: Settings (tokens live in the Keychain, the rest in UserDefaults)
 
@@ -55,6 +60,22 @@ final class AppModel {
     var now = Date()
     @ObservationIgnored private var tick: Timer?
 
+    // MARK: Updates
+
+    /// Set when GitHub's latest release is newer than this build — drives the
+    /// menu item and the update panel.
+    var availableUpdate: GitHubRelease?
+    /// Only surfaced for manual checks; a flaky network shouldn't nag.
+    var updateCheckError: String?
+    let updater = Updater()
+    @ObservationIgnored private var updatePoll: Timer?
+    @ObservationIgnored private var checkingForUpdate = false
+
+    private var lastUpdateCheck: Date? {
+        get { UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "lastUpdateCheck") }
+    }
+
     init() {
         if Self.demo {
             wmjURL = "https://app11.workamajig.com"
@@ -69,6 +90,9 @@ final class AppModel {
                             at: Date().addingTimeInterval(-(47 * 60 + 23)))
             }
             syncTick()
+            if ProcessInfo.processInfo.environment["WMJ_DEMO_UPDATE"] == "1" {
+                availableUpdate = Self.demoRelease
+            }
             return
         }
         isConfigured = !wmjURL.isEmpty && !email.isEmpty
@@ -78,6 +102,7 @@ final class AppModel {
             timer = saved
         }
         syncTick()
+        startUpdatePolling()
     }
 
     func startTimer(_ selection: TaskSelection) {
@@ -111,6 +136,58 @@ final class AppModel {
             tick = nil
         }
         now = Date()
+    }
+
+    // MARK: Updates
+
+    /// Checks at launch and hourly thereafter. The hourly tick plus the 12h
+    /// guard in `checkForUpdate` is what makes this survive sleep/wake — a bare
+    /// 12h timer silently skips a day when the Mac sleeps through it.
+    private func startUpdatePolling() {
+        Task { await checkForUpdate() }
+        updatePoll = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
+            Task { @MainActor in await self.checkForUpdate() }
+        }
+    }
+
+    /// `force` skips the twice-daily throttle and surfaces errors — that's the
+    /// Settings "Check Now" path.
+    func checkForUpdate(force: Bool = false) async {
+        guard !Self.demo, Self.currentVersion != "0.0.0", !checkingForUpdate else { return }
+        if !force, let last = lastUpdateCheck, Date().timeIntervalSince(last) < 12 * 3600 { return }
+        checkingForUpdate = true
+        defer { checkingForUpdate = false }
+        do {
+            let release = try await UpdateCheck.fetchLatest()
+            lastUpdateCheck = Date()
+            updateCheckError = nil
+            guard UpdateCheck.isNewer(release.tagName, than: Self.currentVersion) else {
+                availableUpdate = nil
+                return
+            }
+            availableUpdate = release
+            notifyOnce(about: release)
+        } catch {
+            // Silent unless the user asked: an offline laptop must not nag.
+            updateCheckError = force ? error.localizedDescription : nil
+        }
+    }
+
+    /// One banner per version, so a machine left running for a week doesn't get
+    /// a notification every hour about the same release.
+    private func notifyOnce(about release: GitHubRelease) {
+        guard Bundle.main.bundleIdentifier != nil,   // UNUserNotificationCenter traps unbundled
+              UserDefaults.standard.string(forKey: "notifiedVersion") != release.version else { return }
+        UserDefaults.standard.set(release.version, forKey: "notifiedVersion")
+        let content = UNMutableNotificationContent()
+        content.title = "Wmj Quick Timer \(release.version) is available"
+        content.body = "You have \(Self.currentVersion). Choose “Update…” from the menu bar to install it."
+        let request = UNNotificationRequest(identifier: "update-\(release.version)",
+                                            content: content, trigger: nil)
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert]) { granted, _ in
+            if granted { center.add(request) }
+        }
     }
 
     // MARK: Actions
@@ -200,6 +277,23 @@ extension AppModel {
         WMJTask(taskKey: "t4", taskID: "40", taskName: "Client Review"),
         WMJTask(taskKey: "t5", taskID: "50", taskName: "Project Management"),
     ]
+    /// `WMJ_DEMO_UPDATE=1` — a pending release for update-panel screenshots.
+    static let demoRelease = GitHubRelease(
+        tagName: "v0.3.0",
+        body: """
+            ### Added
+
+            - Automatic update checks, twice a day, with one-click install.
+
+            ### Fixed
+
+            - The Quick Log date resets to today each time the window opens.
+            """,
+        htmlURL: URL(string: "https://github.com/Moosylvania/wmj-timer/releases/tag/v0.3.0")!,
+        assets: [.init(name: "Wmj-Quick-Timer-0.3.0.zip",
+                       browserDownloadURL: URL(string: "https://example.invalid/demo.zip")!,
+                       size: 664_789)])
+
     static let demoServices = [
         Service(serviceCode: "CRTV", description: "Creative"),
         Service(serviceCode: "DEV", description: "Development"),

@@ -4,6 +4,84 @@ import SwiftUI
 enum WindowID {
     static let timer = "timer"
     static let quickLog = "quickLog"
+    static let update = "update"
+}
+
+/// Update window: what's new, and a button that downloads, verifies and
+/// installs the release without the user touching Finder.
+struct UpdatePanel: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let release = model.availableUpdate {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Version \(release.version) is available").font(.headline)
+                    Text("You have \(AppModel.currentVersion).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let notes = release.body?.trimmingCharacters(in: .whitespacesAndNewlines), !notes.isEmpty {
+                    ScrollView {
+                        // SwiftUI parses markdown from a LocalizedStringKey, so
+                        // the CHANGELOG-derived notes render as-is.
+                        Text(.init(notes))
+                            .font(.callout)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: 240)
+                }
+                status(for: release)
+            } else {
+                Text("You're up to date").font(.headline)
+                Text("Version \(AppModel.currentVersion)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .panelChrome()
+    }
+
+    @ViewBuilder
+    private func status(for release: GitHubRelease) -> some View {
+        switch model.updater.phase {
+        case .revealed(let url):
+            Text("Couldn't replace the installed app, so \(release.version) was saved to \(url.deletingLastPathComponent().lastPathComponent). Drag it into your Applications folder to finish.")
+                .font(.caption)
+            Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+        default:
+            HStack {
+                Button("Download & Install") { Task { await model.updater.install(release) } }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.updater.isBusy)
+                if model.updater.isBusy {
+                    ProgressView().controlSize(.small)
+                    Text(busyLabel).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Link("Release Notes", destination: release.htmlURL).font(.caption)
+            }
+            if case .failed(let message) = model.updater.phase {
+                Text(message).font(.caption).foregroundStyle(.red)
+            }
+            if model.updater.isBusy {
+                Text("The app will quit and reopen once the update is installed.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var busyLabel: String {
+        switch model.updater.phase {
+        case .downloading: "Downloading…"
+        case .verifying: "Verifying signature…"
+        case .installing: "Installing…"
+        default: ""
+        }
+    }
 }
 
 /// Timer window: start a timer, or control the one that's running.

@@ -37,6 +37,13 @@ struct WmjQuickTimerApp: App {
         .windowResizability(.contentSize)
         .defaultPosition(.topTrailing)
 
+        Window("Update", id: WindowID.update) {
+            UpdatePanel()
+                .environment(model)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.topTrailing)
+
         Settings {
             SettingsView()
                 .environment(model)
@@ -80,6 +87,7 @@ private struct MenuBarLabel: View {
             case "timer": openWindow(id: WindowID.timer)
             case "quicklog": openWindow(id: WindowID.quickLog)
             case "settings": openSettings()
+            case "update": openWindow(id: WindowID.update)
             default: break
             }
         }

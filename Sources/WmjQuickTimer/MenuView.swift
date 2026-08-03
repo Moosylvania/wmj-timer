@@ -9,6 +9,10 @@ struct MenuView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        if let update = model.availableUpdate {
+            Button("Update to \(update.version)…") { open(WindowID.update) }
+            Divider()
+        }
         if model.isConfigured {
             Button(timerLabel) { open(WindowID.timer) }
             Button("Quick Log") { open(WindowID.quickLog) }

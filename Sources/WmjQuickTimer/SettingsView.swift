@@ -16,6 +16,9 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var status: (message: String, isError: Bool)?
     @State private var verifying = false
+    @State private var updateStatus: (message: String, isError: Bool)?
+    @State private var checkingForUpdate = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         Form {
@@ -62,6 +65,33 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(status.isError ? .red : .green)
                 }
+            }
+
+            Section {
+                HStack {
+                    Text("Version \(AppModel.currentVersion)")
+                    Spacer()
+                    if checkingForUpdate {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Button("Check for Updates") { checkForUpdates() }
+                    }
+                }
+                if let updateStatus {
+                    Text(updateStatus.message)
+                        .font(.caption)
+                        .foregroundStyle(updateStatus.isError ? .red : .secondary)
+                }
+                if model.availableUpdate != nil {
+                    Button("Show Update…") {
+                        NSApp.activate(ignoringOtherApps: true)
+                        openWindow(id: WindowID.update)
+                    }
+                }
+            } footer: {
+                Text("Wmj Quick Timer checks GitHub for a new release twice a day while it's running.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
@@ -112,6 +142,25 @@ struct SettingsView: View {
                 status = ("Connected", false)
             } catch {
                 status = (error.localizedDescription, true)
+            }
+        }
+    }
+
+    private func checkForUpdates() {
+        checkingForUpdate = true
+        updateStatus = nil
+        Task {
+            defer { checkingForUpdate = false }
+            await model.checkForUpdate(force: true)
+            if let error = model.updateCheckError {
+                updateStatus = (error, true)
+            } else if let update = model.availableUpdate {
+                updateStatus = ("Version \(update.version) is available.", false)
+            } else if AppModel.currentVersion == "0.0.0" {
+                // ponytail: `swift run` has no bundle version to compare against.
+                updateStatus = ("Update checks only run from the installed app.", false)
+            } else {
+                updateStatus = ("You're up to date.", false)
             }
         }
     }

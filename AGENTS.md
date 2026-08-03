@@ -16,6 +16,7 @@ Sources/WmjQuickTimerCore/     Testable library: no SwiftUI, no AppKit
   Keychain.swift               SecItem wrapper — both tokens in ONE item
   TimeMath.swift               quarter-hour rounding + Quick Log validation
   TimerState.swift             pure timer state machine (idle/running/stopped)
+  UpdateCheck.swift            GitHub release model + version compare + fetch
 Sources/WmjQuickTimer/         SwiftUI app
   QuickTimerApp.swift          @main: MenuBarExtra + Window scenes + Settings scene
   MenuView.swift               the dropdown menu (menu items only)
@@ -23,6 +24,7 @@ Sources/WmjQuickTimer/         SwiftUI app
   LogTimeForm.swift            ProjectField (type-ahead) + shared project/task/service form
   SettingsView.swift           preferences window
   AppModel.swift               @Observable @MainActor hub: settings, data, timer, submit
+  Updater.swift                download → verify signature → swap bundle → relaunch
 Tests/WmjQuickTimerCoreTests/  XCTest over Core only
 Support/Info.plist             bundle plist (LSUIElement, CFBundleIconFile…)
 Support/Resources/             AppIcon.icns, MenuBarIcon.png/@2x — copied into the bundle
@@ -75,7 +77,17 @@ These are the things that break if you forget them:
 - Persistence: non-secrets and the encoded `TimerState` in `UserDefaults` (via `didSet`), tokens in the Keychain. Nothing else.
 - No third-party dependencies. URLSession, Security, ServiceManagement, SwiftUI, AppKit only. Don't add a package for something a few lines can do.
 - Deliberate shortcuts are marked with a `// ponytail:` comment naming the ceiling. Follow that convention instead of silently taking a shortcut.
-- **Demo mode**: `WMJ_DEMO=1` (checked via `AppModel.demo`) runs the whole UI on canned fake data — no API calls, no Keychain reads, no UserDefaults writes. Use it for screenshots or UI poking without real credentials; keep any new API/Keychain/persistence touchpoint behind the same flag. `WMJ_DEMO_OPEN=timer|quicklog|settings` opens that window at launch (screenshots need no UI scripting); `WMJ_DEMO_IDLE=1` skips the pre-seeded running timer so the start-form shows.
+- **Demo mode**: `WMJ_DEMO=1` (checked via `AppModel.demo`) runs the whole UI on canned fake data — no API calls, no Keychain reads, no UserDefaults writes. Use it for screenshots or UI poking without real credentials; keep any new API/Keychain/persistence touchpoint behind the same flag. `WMJ_DEMO_OPEN=timer|quicklog|settings|update` opens that window at launch (screenshots need no UI scripting); `WMJ_DEMO_IDLE=1` skips the pre-seeded running timer so the start-form shows; `WMJ_DEMO_UPDATE=1` seeds a fake pending release so the update panel has something to show.
+
+## Self-update
+
+The app polls `GET /repos/Moosylvania/wmj-timer/releases/latest` (unauthenticated, 60 req/hr is plenty) and installs the zip itself — `Updater.swift`. Things that bite:
+
+- **`codesign -R` needs a leading `=` on the requirement string.** Without it codesign reads the argument as a *path to a requirement file*, fails with "No such file or directory / invalid requirement specification", and rejects the genuine release exactly like a forged one — a bug that looks like working security. The requirement pins team `RTNF9A97B6` + identifier `com.moosylvania.QuickTimer`; verify before trusting a downloaded bundle, always.
+- **Zips fetched with URLSession carry no `com.apple.quarantine`** (LaunchServices applies that, not the network layer), so an installed update doesn't trip Gatekeeper the way a browser download would. `spctl -a -vv` on the swapped bundle should still say `source=Notarized Developer ID`; `ditto`/`mv` preserve the stapled ticket.
+- **A running bundle can't replace itself in place.** The swap is handed to a detached `/bin/sh` that waits for the PID to exit, then `rm -rf` + `mv` + `open`. Copy the new app out of the temp dir *before* returning — the `defer` deletes it.
+- **Version only exists in the packaged bundle.** `AppModel.currentVersion` falls back to `0.0.0` under `swift run`, which suppresses update checks entirely. `package.sh` patches both `CFBundleShortVersionString` and `CFBundleVersion`.
+- Checks are throttled to twice a day via a `lastUpdateCheck` UserDefaults date, polled hourly so sleep/wake can't skip a day. The banner fires once per version (`notifiedVersion`). Delete both keys from `com.moosylvania.QuickTimer` to re-test.
 
 ## Workamajig API facts
 

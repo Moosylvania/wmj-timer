@@ -91,6 +91,20 @@ That is macOS asking your permission, not the app phoning home:
 
 Every release is signed with the same Apple Developer ID, so the Keychain treats updates as the same app — after you click **Always Allow** once, updates won't ask again. (One exception: upgrading from 0.1.0, which was signed differently, triggers the prompt one last time.) If you'd rather clear it out entirely, search for `com.moosylvania.WmjQuickTimer` in **Keychain Access** to see, or delete, exactly what's stored.
 
+## Updating
+
+The app checks GitHub for a new release when it launches and twice a day while it's running. You don't need to do anything to stay current.
+
+When a newer version exists, **Update to X.Y.Z…** appears at the top of the menu bar menu (and macOS shows a notification the first time). Choosing it opens a window with that version's release notes and a **Download & Install** button:
+
+1. The release is downloaded from GitHub.
+2. Its signature is checked — an app that isn't signed by Moosylvania is never installed.
+3. The installed app is replaced and reopens itself. Your settings, tokens, and any running timer are untouched.
+
+If the app can't write to where it's installed (for example, it's in a folder you don't have permission to change), the new version is saved to your **Downloads** folder and revealed in Finder — drag it into **Applications** to finish, replacing the old copy.
+
+You can check on demand any time from **Settings**, which also shows the version you're running.
+
 ## Start at login
 
 In the app's Settings, enable **Start at login** so the timer is always available. (This only works when the app is run from the `.app` bundle in Applications, not when launched via `swift run` during development.)

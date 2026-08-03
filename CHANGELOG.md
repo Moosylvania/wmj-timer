@@ -5,7 +5,17 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
-## [Unreleased]
+## [0.3.0] - 2026-08-03
+
+### Added
+
+- Automatic update checks. The app asks GitHub for the latest release when it starts and twice a day after that, then shows **Update to X.Y.Z…** in the menu bar (plus a notification the first time it sees a new version).
+- One-click install. The update window shows the new version's release notes and a **Download & Install** button that downloads the release, checks it is signed by Moosylvania, replaces the installed app, and reopens it. If the app can't be replaced where it sits, the new version is saved to Downloads and revealed in Finder instead.
+- Settings shows the installed version and a **Check for Updates** button.
+
+### Fixed
+
+- Released builds now set `CFBundleVersion` to the release version instead of always shipping `1`.
 
 ## [0.2.2] - 2026-08-03
 

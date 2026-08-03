@@ -19,6 +19,7 @@ cp .build/apple/Products/Release/WmjQuickTimer "$APP/Contents/MacOS/WmjQuickTime
 cp Support/Info.plist "$APP/Contents/Info.plist"
 cp Support/Resources/* "$APP/Contents/Resources/"   # app icon + menu bar icon
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$APP/Contents/Info.plist"
 
 # Hardened runtime + secure timestamp are required for notarization. No --deep:
 # the bundle is a single binary with no nested code.
