@@ -1,4 +1,5 @@
 # WMJ Quick Timer
+<img src="images/chess-clock-sharp-light-full.svg" width="260" height="260" alt="WMJ Quick Timer Logo Icon" style="margin:0 auto;" />
 
 A macOS menu bar app for logging time to [Workamajig](https://www.workamajig.com): quick-log hours against a project/task, or run a live timer that submits quarter-hour-rounded time to your timesheet.
 
