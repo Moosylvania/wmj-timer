@@ -90,10 +90,14 @@ struct LogTimeForm: View {
 
     let submitLabel: String
     let showsHours: Bool
+    /// Seeds the form with an existing selection (Change Project…) so the user
+    /// edits from what the timer holds instead of a blank slate.
+    var prefill: TaskSelection?
     let onSubmit: (TaskSelection, Double, Date) async throws -> Void
 
     @State private var project: Project?
     @State private var tasks: [WMJTask] = []
+    @State private var tasksLoaded = false
     @State private var task: WMJTask?
     @State private var serviceCode = ""
     @State private var hours = 1.0
@@ -128,14 +132,21 @@ struct LogTimeForm: View {
                 }
                 GridRow {
                     Text("Task")
-                    Picker("Task", selection: $task) {
-                        Text(project == nil ? "Select a project first" : "Select…").tag(WMJTask?.none)
-                        ForEach(tasks) { t in
-                            Text(t.taskName).tag(Optional(t))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Picker("Task", selection: $task) {
+                            Text(project == nil ? "Select a project first" : "Select…").tag(WMJTask?.none)
+                            ForEach(tasks) { t in
+                                Text(t.taskName).tag(Optional(t))
+                            }
+                        }
+                        .labelsHidden()
+                        .disabled(tasks.isEmpty)
+                        if project != nil, tasksLoaded, tasks.isEmpty {
+                            Text("No active tasks available to you on this project.")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
                         }
                     }
-                    .labelsHidden()
-                    .disabled(tasks.isEmpty)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 GridRow {
@@ -191,6 +202,10 @@ struct LogTimeForm: View {
             // @State keeps the last draft across window opens — the date must
             // not go stale with it.
             workDate = Date()
+            if let prefill, project == nil {
+                project = model.projects.first { $0.projectNumber == prefill.projectNumber }
+                serviceCode = prefill.serviceCode
+            }
             if serviceCode.isEmpty { serviceCode = model.defaultServiceCode }
             // Demo screenshots show a filled form, not an empty one.
             if AppModel.demo, project == nil { project = model.projects.first }
@@ -200,11 +215,16 @@ struct LogTimeForm: View {
     private func loadTasks() {
         task = nil
         tasks = []
+        tasksLoaded = false
         guard let project else { return }
         Task {
             do {
                 tasks = try await model.tasks(projectKey: project.projectKey)
+                tasksLoaded = true
                 if tasks.count == 1 { task = tasks.first }
+                if task == nil, let prefill, prefill.projectNumber == project.projectNumber {
+                    task = tasks.first { $0.taskID == prefill.taskID }
+                }
                 if AppModel.demo, task == nil { task = tasks.first }
             } catch {
                 self.error = error.localizedDescription
@@ -221,6 +241,9 @@ struct LogTimeForm: View {
             defer { busy = false }
             do {
                 try await onSubmit(selection, hours, workDate)
+                // Sticky service: the next form (Timer or Quick Log) starts
+                // on whatever service was last used successfully.
+                model.defaultServiceCode = selection.serviceCode
                 confirmation = "Logged ✓"
             } catch {
                 self.error = error.localizedDescription

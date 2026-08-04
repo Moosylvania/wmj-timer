@@ -28,6 +28,24 @@ final class TimerStateTests: XCTestCase {
         XCTAssertNil(state.selection)
     }
 
+    func testReassignKeepsElapsed() {
+        let other = TaskSelection(projectNumber: "25-Y-2", projectName: "Y",
+                                  taskID: "2", taskName: "QA", serviceCode: "qa")
+        var state = TimerState()
+        state.reassign(other)
+        XCTAssertNil(state.selection, "idle timer has nothing to reassign")
+
+        state.start(selection, at: t0)
+        state.reassign(other)
+        XCTAssertEqual(state.selection, other)
+        XCTAssertEqual(state.elapsed(now: t0.addingTimeInterval(600)), 600, "running elapsed survives")
+
+        state.stop(at: t0.addingTimeInterval(600))
+        state.reassign(selection)
+        XCTAssertEqual(state.selection, selection)
+        XCTAssertEqual(state.elapsed(now: t0.addingTimeInterval(9999)), 600, "stopped elapsed survives")
+    }
+
     func testInvalidTransitionsAreNoOps() {
         var state = TimerState()
         state.stop()

@@ -24,6 +24,11 @@ final class AppModel {
     var defaultServiceCode: String = UserDefaults.standard.string(forKey: "defaultServiceCode") ?? "" {
         didSet { if !Self.demo { UserDefaults.standard.set(defaultServiceCode, forKey: "defaultServiceCode") } }
     }
+    /// This user's Workamajig userKey, bootstrapped from their own timesheet
+    /// (see `APIClient.recentActivity`) — drives the assigned-task filter.
+    var userKey: String? = UserDefaults.standard.string(forKey: "userKey") {
+        didSet { if !Self.demo { UserDefaults.standard.set(userKey, forKey: "userKey") } }
+    }
     /// Stored, not computed: the Keychain isn't observable, so the menu would
     /// never notice tokens being saved.
     private(set) var isConfigured = false
@@ -50,6 +55,9 @@ final class AppModel {
     var projects: [Project] = []
     var services: [Service] = []
     var loadError: String?
+    /// Projects on the user's recent timesheets, most recent first — used only
+    /// to rank the search list (membership can't be queried; see AGENTS.md).
+    @ObservationIgnored private var recentProjectKeys: [String] = []
     @ObservationIgnored private var loading = false
 
     // MARK: Timer
@@ -110,6 +118,29 @@ final class AppModel {
         syncTick()
     }
 
+    /// Pre-start proof that the user can log time to the selection — the only
+    /// authoritative check the API offers is a real POST. A row already on
+    /// today's timesheet for the same project/task/service is proof by itself;
+    /// otherwise post a 0-hour entry and leave it (optimistic: stop/submit
+    /// merges the real hours into that row). Throws to block the timer.
+    func validateCanLog(_ selection: TaskSelection) async throws {
+        if Self.demo { return }
+        if let existing = try? await api.timeEntries(on: Date()),
+           existing.firstMatch(selection) != nil { return }
+        do {
+            try await api.submit(TimeEntry(userID: email.lowercased(), hours: 0,
+                                           projectNumber: selection.projectNumber,
+                                           taskID: selection.taskID,
+                                           serviceCode: selection.serviceCode,
+                                           workDate: Date(),
+                                           // The API requires a comment on 0-hour entries.
+                                           comments: "WMJ Quick Timer"))
+        } catch let error as URLError {
+            // Offline must never block a local timer; submit surfaces it later.
+            APIClient.log("pre-start validation skipped (network): \(error)")
+        }
+    }
+
     func stopTimer() {
         timer.stop()
         syncTick()
@@ -122,6 +153,13 @@ final class AppModel {
 
     func discardTimer() {
         timer.discard()
+        syncTick()
+    }
+
+    /// Re-point a running/stopped timer at a different project/task/service,
+    /// keeping the elapsed time — for when Workamajig rejects the original.
+    func changeTaskSelection(_ selection: TaskSelection) {
+        timer.reassign(selection)
         syncTick()
     }
 
@@ -203,7 +241,23 @@ final class AppModel {
         defer { loading = false }
         do {
             if services.isEmpty { services = try await api.services() }
-            projects = try await api.projects().sorted { $0.projectName < $1.projectName }
+            if recentProjectKeys.isEmpty {
+                // Once per session: my userKey + recently-logged projects, from
+                // my own timesheet. Optional data — a failure must not block
+                // the project list (but does get logged).
+                do {
+                    let recent = try await api.recentActivity()
+                    if let key = recent.userKey { userKey = key }
+                    recentProjectKeys = recent.projectKeys
+                } catch {
+                    APIClient.log("recentActivity failed: \(error)")
+                }
+            }
+            let rank = Dictionary(uniqueKeysWithValues:
+                recentProjectKeys.enumerated().map { ($1, $0) })
+            projects = try await api.projects().sorted {
+                (rank[$0.projectKey] ?? .max, $0.projectName) < (rank[$1.projectKey] ?? .max, $1.projectName)
+            }
             loadError = nil
         } catch is CancellationError {
             // View went away mid-fetch — not something to show the user.
@@ -213,9 +267,12 @@ final class AppModel {
         }
     }
 
-    /// Tasks for a project — the one lookup views need on demand.
+    /// Tasks for a project the user can plausibly log time to: not completed,
+    /// and assigned to them or unassigned. The API has no real "can log time"
+    /// check short of POSTing an entry, so this is the best available gate.
     func tasks(projectKey: String) async throws -> [WMJTask] {
-        Self.demo ? Self.demoTasks : try await api.tasks(projectKey: projectKey)
+        let all = Self.demo ? Self.demoTasks : try await api.tasks(projectKey: projectKey)
+        return all.filter { $0.isActive && $0.isAvailable(to: Self.demo ? "me" : userKey) }
     }
 
     /// Post time using the lowercased email as userID — Workamajig accepts it
@@ -270,10 +327,15 @@ extension AppModel {
         Project(projectKey: "d4", projectNumber: "GLOBEX-3310", projectName: "Q3 Media Plan", clientName: "Globex Corporation"),
         Project(projectKey: "d5", projectNumber: "INIT-4400", projectName: "Product Launch Video", clientName: "Initech"),
     ]
+    /// Includes a completed task and one assigned to someone else, so demo mode
+    /// exercises the filter in `tasks(projectKey:)` — three tasks show.
     static let demoTasks = [
-        WMJTask(taskKey: "t1", taskID: "10", taskName: "Discovery"),
-        WMJTask(taskKey: "t2", taskID: "20", taskName: "Design"),
-        WMJTask(taskKey: "t3", taskID: "30", taskName: "Development"),
+        WMJTask(taskKey: "t1", taskID: "10", taskName: "Discovery",
+                percComp: 100, completedByDate: "6/2/2026 12:00:00 AM"),
+        WMJTask(taskKey: "t2", taskID: "20", taskName: "Design",
+                taskUsers: [TaskUser(userKey: "someone-else")]),
+        WMJTask(taskKey: "t3", taskID: "30", taskName: "Development",
+                taskUsers: [TaskUser(userKey: "me")]),
         WMJTask(taskKey: "t4", taskID: "40", taskName: "Client Review"),
         WMJTask(taskKey: "t5", taskID: "50", taskName: "Project Management"),
     ]

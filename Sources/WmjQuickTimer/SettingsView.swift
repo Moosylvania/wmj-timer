@@ -51,6 +51,10 @@ struct SettingsView: View {
             Section {
                 Toggle("Start at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { toggleLaunchAtLogin() }
+            } footer: {
+                Text("Menu bar icon hidden by the notch? Press ⌃⌥T (Timer) or ⌃⌥L (Quick Log) anywhere, or launch Wmj Quick Timer again from Spotlight.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {

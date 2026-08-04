@@ -90,6 +90,7 @@ struct TimerPanel: View {
     @Environment(\.dismiss) private var dismiss
     @State private var submitting = false
     @State private var submitError: String?
+    @State private var changingTask = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -97,6 +98,9 @@ struct TimerPanel: View {
             case .idle:
                 Text("Start a Timer").font(.headline)
                 LogTimeForm(submitLabel: "Start", showsHours: false) { selection, _, _ in
+                    // A failed check throws back into the form's error text and
+                    // the timer never starts.
+                    try await model.validateCanLog(selection)
                     model.startTimer(selection)
                     dismiss()
                 }
@@ -109,21 +113,36 @@ struct TimerPanel: View {
                 .controlSize(.large)
             case .stopped:
                 elapsedHeader
-                Text("Will log \(model.timer.submittableHours(), format: .number) hours")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Button("Resume") { model.resumeTimer() }
-                    Button("Submit Time") { submit() }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(submitting)
-                    Spacer()
-                    Button("Discard", role: .destructive) {
-                        model.discardTimer()
-                        dismiss()
+                if changingTask {
+                    // Re-point the timer without losing elapsed time — the way
+                    // out when Workamajig rejects the original selection.
+                    LogTimeForm(submitLabel: "Save", showsHours: false,
+                                prefill: model.timer.selection) { selection, _, _ in
+                        model.changeTaskSelection(selection)
+                        submitError = nil
+                        changingTask = false
                     }
+                    Button("Cancel") { changingTask = false }
+                } else {
+                    Text("Will log \(model.timer.submittableHours(), format: .number) hours")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Button("Resume") { model.resumeTimer() }
+                        Button("Submit Time") { submit() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(submitting)
+                        Spacer()
+                        Button("Discard", role: .destructive) {
+                            model.discardTimer()
+                            dismiss()
+                        }
+                    }
+                    Button("Change Project…") { changingTask = true }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    if submitting { ProgressView().controlSize(.small) }
                 }
-                if submitting { ProgressView().controlSize(.small) }
             }
             if let message = submitError ?? model.loadError {
                 Text(message).font(.caption).foregroundStyle(.red)

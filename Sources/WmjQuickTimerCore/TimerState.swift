@@ -69,6 +69,13 @@ public struct TimerState: Codable, Equatable, Sendable {
         }
     }
 
+    /// Swap what a running/stopped timer charges to, keeping the elapsed time —
+    /// the recovery path when Workamajig rejects the original selection.
+    public mutating func reassign(_ selection: TaskSelection) {
+        if case .idle = phase { return }
+        self.selection = selection
+    }
+
     public mutating func discard() {
         phase = .idle
         selection = nil

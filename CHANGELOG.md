@@ -5,6 +5,22 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
+## [0.3.1] - 2026-08-04
+
+### Added
+
+- Global shortcuts: **⌃⌥T** opens the Timer window and **⌃⌥L** opens Quick Log from anywhere — the app stays reachable when the notch or a crowded menu bar hides its icon.
+- Relaunching the app while it's running (Spotlight, Finder) now opens the Timer window if a timer is going, otherwise Quick Log, instead of doing nothing.
+- The task picker now hides completed tasks and tasks assigned only to other people, and says so when a project has no tasks you can log to. (The Workamajig API has no way to list only the projects you're a member of, so all projects stay searchable.)
+- Projects you've logged time to recently sort to the top of the project search.
+- **Change Project…** in the stopped Timer window re-points the timer at a different project/task/service without losing the elapsed time — the way out when Workamajig no longer accepts the original job.
+- Starting a timer now verifies with Workamajig that you can actually log time to the selected job: an entry already on today's timesheet counts as proof, otherwise a 0-hour entry is placed on the timesheet (your submitted time merges into it later). If Workamajig rejects it, the timer doesn't start and the reason is shown. Being offline never blocks a timer.
+
+### Changed
+
+- The Service picker now remembers the service you last logged with (Timer or Quick Log) instead of resetting.
+- Workamajig errors show just the human-readable message ("The project is valid, but the user doesn't have access to it.") instead of the raw JSON blob; the full response still lands in `~/Library/Logs/WmjQuickTimer.log`, and response-decoding failures are now logged there too.
+
 ## [0.3.0] - 2026-08-03
 
 ### Added

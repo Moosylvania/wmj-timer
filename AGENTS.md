@@ -95,14 +95,22 @@ Base `{wmjURL}/api/beta1`, headers `APIAccessToken` (company) + `UserToken` (use
 
 | Endpoint | Notes |
 |---|---|
-| `GET /projects` | **PascalCase** JSON (`ProjectKey`, `ProjectNumber`, `ProjectName`, `ClientName`) |
-| `GET /tasks?projectKey=&includeTaskUser=true` | **camelCase**; `taskID` is usually a number but can be any string ("2.1.1" on outline-numbered jobs) — decoded to and posted as a string |
+| `GET /projects` | **PascalCase** JSON (`ProjectKey`, `ProjectNumber`, `ProjectName`, `ClientName`, also `ProjectStatus`/`ProjectStatusID`). Accepts ONLY `searchFor`+`searchField` — any other query param is a 400. There is **no membership filter**: admins get every project, and `POST /time` is the only thing that knows whether the user can actually log to one |
+| `GET /tasks?projectKey=&includeTaskUser=true` | **camelCase**; `taskID` is usually a number but can be any string ("2.1.1" on outline-numbered jobs) — decoded to and posted as a string. Also returns `percComp`, `completedByDate` ("1/1/1900 …" = never), and `taskUser` (assignments with `userKey`/`userName`/`serviceCode`). `taskStatus` (1/2/3) is a **schedule** indicator (3 = late), NOT open/closed — filter completion on `percComp`/`completedByDate` |
 | `GET /services` | PascalCase (`ServiceCode`, `Description`) |
 | `POST /time` | Body is a JSON **array** of entries; success is `{"success":[…]}`; `workDate` is `M/d/yyyy` with `en_US_POSIX` |
 | `GET /time?startDate=&endDate=&includeTime=1` | Timesheets (UserToken-scoped) with `TimeEntries` inside; entry `taskID` is a **string** here and `serviceCode` comes back lowercased |
 | `PUT /time` | Update an entry: array body `[{"timeKey":…,"hours":…}]` suffices; same success envelope. Used by merge-on-submit (`AppModel.submitTime`) |
 
 Field casing is inconsistent per module — every model spells out `CodingKeys`. Verify against `scripts/smoke.sh` output before trusting a new model.
+
+More hard-won API facts:
+
+- **Rate limiting is real**: ~55 rapid sequential requests returned HTTP 429. Never loop over projects calling `/tasks` per project.
+- **The user's own `userKey`** comes from their timesheet entries (`GET /time` is UserToken-scoped; each entry has `userKey`), and it matches `taskUser[].userKey` on assignments. That's how `AppModel.userKey` is bootstrapped — `/users`, `/todos`, and `/employees/search` are permission-gated dead ends.
+- **Error bodies have two shapes**: `{"status":…,"description":…}` and `{"logid":…,"errors":[{"error":[{"message":…,"status":…}]}]}` (occasionally `{"errors":["-3"]}`). `APIErrorBody` decodes all of them; surface `message`, log the raw body.
+
+Pre-start validation (`AppModel.validateCanLog`) is a deliberate real write: a 0-hour `POST /time` (skipped when today already has a matching row). There is no dry-run or DELETE endpoint — the 0-hour row staying on the timesheet is the accepted cost, and merge-on-submit later folds real hours into it.
 
 Two error cases users hit: `403` with "not enabled" (admin must enable API access — mapped to `APIError.accessNotEnabled`), and `401` (the token's user lacks the security rights).
 

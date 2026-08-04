@@ -54,12 +54,6 @@ public final class APIClient: Sendable {
     /// Entries already on the user's timesheet for one day (the UserToken
     /// scopes the query to the current user).
     public func timeEntries(on date: Date) async throws -> [TimesheetEntry] {
-        let day = TimeEntry.apiDateString(date)
-        let list: Envelope<TimesheetList> = try await get("time", query: [
-            .init(name: "startDate", value: day),
-            .init(name: "endDate", value: day),
-            .init(name: "includeTime", value: "1"),
-        ])
         // A timesheet can span more than the requested day — trust each
         // entry's own workDate ("2026-07-31T00:00:00", no timezone), compared
         // as a plain yyyy-MM-dd prefix to avoid timezone math entirely.
@@ -67,8 +61,31 @@ public final class APIClient: Sendable {
         fmt.locale = Locale(identifier: "en_US_POSIX")
         fmt.dateFormat = "yyyy-MM-dd"
         let dayPrefix = fmt.string(from: date)
-        return list.data.timesheet.flatMap { $0.timeEntries ?? [] }
+        return try await timesheetEntries(start: date, end: date)
             .filter { $0.workDate.hasPrefix(dayPrefix) }
+    }
+
+    /// Who the UserToken belongs to and what they've logged lately, from their
+    /// own timesheets — the only "membership" signal the API exposes without
+    /// admin-only endpoints (/users, /employees/search are permission-gated).
+    /// `userKey` matches `TaskUser.userKey` on task assignments.
+    public func recentActivity(lookbackDays: Int = 90) async throws
+        -> (userKey: String?, projectKeys: [String]) {
+        let entries = try await timesheetEntries(
+            start: Date().addingTimeInterval(-Double(lookbackDays) * 86_400), end: Date())
+        var seen = Set<String>()
+        let projectKeys = entries.compactMap(\.projectKey)
+            .filter { !$0.isEmpty && seen.insert($0).inserted }
+        return (entries.compactMap(\.userKey).first { !$0.isEmpty }, projectKeys)
+    }
+
+    private func timesheetEntries(start: Date, end: Date) async throws -> [TimesheetEntry] {
+        let list: Envelope<TimesheetList> = try await get("time", query: [
+            .init(name: "startDate", value: TimeEntry.apiDateString(start)),
+            .init(name: "endDate", value: TimeEntry.apiDateString(end)),
+            .init(name: "includeTime", value: "1"),
+        ])
+        return list.data.timesheet.flatMap { $0.timeEntries ?? [] }
     }
 
     /// Replaces an existing entry's hours (merge-on-submit computes the new total).
@@ -83,8 +100,8 @@ public final class APIClient: Sendable {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let success = json["success"] as? [Any], !success.isEmpty else {
             Self.log("\(method) /time unexpected body\n\(String(data: data.prefix(4096), encoding: .utf8) ?? "")")
-            let text = String(data: data.prefix(300), encoding: .utf8) ?? ""
-            throw APIError.badResponse(text)
+            let message = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
+            throw APIError.badResponse(message ?? "details in ~/Library/Logs/WmjQuickTimer.log")
         }
     }
 
@@ -95,7 +112,8 @@ public final class APIClient: Sendable {
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            throw APIError.badResponse(String(describing: error))
+            Self.log("GET /\(path) decode failure: \(error)\n\(String(data: data.prefix(4096), encoding: .utf8) ?? "")")
+            throw APIError.badResponse("details in ~/Library/Logs/WmjQuickTimer.log")
         }
     }
 
@@ -117,7 +135,7 @@ public final class APIClient: Sendable {
             let body = String(data: data.prefix(4096), encoding: .utf8) ?? ""
             Self.log("HTTP \(status) \(method) /\(path)\n\(body)")
             let bodyError = try? JSONDecoder().decode(APIErrorBody.self, from: data)
-            let description = bodyError?.description ?? String(data: data.prefix(200), encoding: .utf8) ?? ""
+            let description = bodyError?.message ?? String(data: data.prefix(200), encoding: .utf8) ?? ""
             if status == 403, description.localizedCaseInsensitiveContains("not enabled") {
                 throw APIError.accessNotEnabled
             }

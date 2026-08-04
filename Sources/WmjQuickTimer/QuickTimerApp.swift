@@ -5,6 +5,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // No Dock icon, even when run via `swift run` without the bundle plist.
         NSApp.setActivationPolicy(.accessory)
+        HotKeys.install()
+    }
+
+    /// Launching the app again while it's running (Spotlight, Finder) lands
+    /// here — the escape hatch when the menu bar icon is hidden by the notch.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        NotificationCenter.default.post(name: .wmjOpenPanel, object: nil)
+        return false
     }
 }
 
@@ -80,6 +88,12 @@ private struct MenuBarLabel: View {
             }
         }
         .labelStyle(.titleAndIcon)
+        .onReceive(NotificationCenter.default.publisher(for: .wmjOpenPanel)) { note in
+            NSApp.activate(ignoringOtherApps: true)
+            let id = note.object as? String
+                ?? (model.timer.phase == .idle ? WindowID.quickLog : WindowID.timer)
+            openWindow(id: id)
+        }
         .task {
             guard AppModel.demo else { return }
             NSApp.activate(ignoringOtherApps: true)

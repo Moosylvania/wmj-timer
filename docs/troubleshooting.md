@@ -8,7 +8,7 @@ Workamajig blocks API calls per-user until an admin enables access. Ask your adm
 
 - The email in Settings must exactly match your Workamajig login email — it's used as your user ID when posting time. Check for typos and confirm with your admin which email is on your employee record.
 - Some Workamajig setups require a **Service code** on every entry — make sure one is selected.
-- The task must allow time to be charged to it (and to you). Try the same entry in the Workamajig web UI; if it fails there too, it's a project setup issue.
+- The task must allow time to be charged to it (and to you). The task picker already hides completed tasks and tasks assigned only to other people, but it can't see project **team membership** — on a project you're not a member of, submitting fails with "The project is valid, but the user doesn't have access to it." Ask to be added to the project team, or use **Change Project…** in the Timer window to move the tracked time to a job you can log to. Try the same entry in the Workamajig web UI; if it fails there too, it's a project setup issue.
 
 ## macOS won't open the app ("damaged" / "unidentified developer")
 
@@ -43,4 +43,9 @@ Open it with Console.app or any text editor (in Finder: **Go → Go to Folder…
 
 ## The menu bar icon is missing
 
-macOS hides menu bar items when the bar is full (especially on notched MacBooks). Remove or rearrange other menu bar items (⌘-drag), or use an app like Bartender/Ice. Also confirm the app is actually running: it has no Dock icon by design.
+macOS hides menu bar items when the bar is full (especially on notched MacBooks), and offers apps no way to pin their icon or claim priority. The app stays reachable anyway:
+
+- **⌃⌥T** opens the Timer window and **⌃⌥L** opens Quick Log, from anywhere.
+- Launch the app again (Spotlight → "Wmj Quick Timer" → Return, or double-click it in Finder) — the running copy opens the Timer window if a timer is going, otherwise Quick Log.
+
+To get the icon back, remove or rearrange other menu bar items (⌘-drag), or use an app like Bartender/Ice. Also confirm the app is actually running: it has no Dock icon by design.

@@ -26,25 +26,68 @@ public struct Project: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// One row of a task's `taskUser` array (`includeTaskUser=true`) — an
+/// assignment. `userKey` matches the `userKey` on the user's own timesheet
+/// entries, which is how the app identifies "me" without admin-only endpoints.
+public struct TaskUser: Codable, Hashable, Sendable {
+    public var userKey: String
+    public var userName: String?
+    public var serviceCode: String?
+
+    public init(userKey: String, userName: String? = nil, serviceCode: String? = nil) {
+        self.userKey = userKey
+        self.userName = userName
+        self.serviceCode = serviceCode
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case userKey, userName, serviceCode
+    }
+}
+
 public struct WMJTask: Codable, Identifiable, Hashable, Sendable {
     public var taskKey: String
     /// Stored as a string: the API returns a number for most projects but
     /// strings like "2.1.1" for some, and POST /time takes it as a string anyway.
     public var taskID: String
     public var taskName: String
+    /// Schedule indicator (1/2/3 ≈ upcoming/current/late), NOT open vs closed —
+    /// completion lives in `percComp`/`completedByDate`.
     public var taskStatus: Double?
+    public var percComp: Double?
+    /// "1/1/1900 12:00:00 AM" (or empty) means never completed.
+    public var completedByDate: String?
+    public var taskUsers: [TaskUser]
 
     public var id: String { taskKey }
 
-    public init(taskKey: String, taskID: String, taskName: String, taskStatus: Double? = nil) {
+    /// Not completed — time can still be charged to it.
+    public var isActive: Bool {
+        guard percComp != 100 else { return false }
+        guard let date = completedByDate, !date.isEmpty else { return true }
+        return date.hasPrefix("1/1/1900")
+    }
+
+    /// Unassigned tasks stay available (some setups allow logging to any task
+    /// on a member project); an unknown userKey means we can't tell — show it.
+    public func isAvailable(to userKey: String?) -> Bool {
+        taskUsers.isEmpty || userKey == nil || taskUsers.contains { $0.userKey == userKey }
+    }
+
+    public init(taskKey: String, taskID: String, taskName: String, taskStatus: Double? = nil,
+                percComp: Double? = nil, completedByDate: String? = nil, taskUsers: [TaskUser] = []) {
         self.taskKey = taskKey
         self.taskID = taskID
         self.taskName = taskName
         self.taskStatus = taskStatus
+        self.percComp = percComp
+        self.completedByDate = completedByDate
+        self.taskUsers = taskUsers
     }
 
     enum CodingKeys: String, CodingKey {
-        case taskKey, taskID, taskName, taskStatus
+        case taskKey, taskID, taskName, taskStatus, percComp, completedByDate
+        case taskUsers = "taskUser"
     }
 
     /// Accept `taskID` as a number (42 → "42") or any string ("2.1.1").
@@ -53,6 +96,9 @@ public struct WMJTask: Codable, Identifiable, Hashable, Sendable {
         taskKey = try c.decode(String.self, forKey: .taskKey)
         taskName = try c.decode(String.self, forKey: .taskName)
         taskStatus = try? c.decode(Double.self, forKey: .taskStatus)
+        percComp = try? c.decode(Double.self, forKey: .percComp)
+        completedByDate = try? c.decode(String.self, forKey: .completedByDate)
+        taskUsers = (try? c.decode([TaskUser].self, forKey: .taskUsers)) ?? []
         if let string = try? c.decode(String.self, forKey: .taskID) {
             taskID = string
         } else {
@@ -119,19 +165,26 @@ public struct TimesheetEntry: Codable, Sendable {
     public var taskID: String
     public var serviceCode: String
     public var workDate: String   // "2026-07-31T00:00:00"
+    /// The entry's owner — timesheets are UserToken-scoped, so this is how the
+    /// app learns its own userKey (matches `TaskUser.userKey`).
+    public var userKey: String?
+    public var projectKey: String?
 
     public init(timeKey: String, actualHours: Double, projectNumber: String,
-                taskID: String, serviceCode: String, workDate: String) {
+                taskID: String, serviceCode: String, workDate: String,
+                userKey: String? = nil, projectKey: String? = nil) {
         self.timeKey = timeKey
         self.actualHours = actualHours
         self.projectNumber = projectNumber
         self.taskID = taskID
         self.serviceCode = serviceCode
         self.workDate = workDate
+        self.userKey = userKey
+        self.projectKey = projectKey
     }
 
     enum CodingKeys: String, CodingKey {
-        case timeKey, actualHours, projectNumber, taskID, serviceCode, workDate
+        case timeKey, actualHours, projectNumber, taskID, serviceCode, workDate, userKey, projectKey
     }
 }
 
@@ -164,9 +217,36 @@ struct TimesheetList: Decodable {
 struct TaskList: Decodable { var task: [WMJTask] }
 struct ServiceList: Decodable { var service: [Service] }
 
+/// Workamajig error bodies come in two shapes:
+/// `{"status":…,"description":…}` and
+/// `{"logid":…,"errors":[{"error":[{"message":…,"status":…}]}]}` — plus the
+/// occasional `{"errors":["-3"]}` with bare strings. Everything is optional so
+/// any of them decodes.
 struct APIErrorBody: Decodable {
+    struct ErrorGroup: Decodable {
+        var messages: [String] = []
+
+        init(from decoder: Decoder) throws {
+            struct Item: Decodable { var message: String? }
+            struct Keyed: Decodable { var error: [Item]? }
+            if let keyed = try? decoder.singleValueContainer().decode(Keyed.self) {
+                messages = (keyed.error ?? []).compactMap(\.message)
+            } else if let text = try? decoder.singleValueContainer().decode(String.self) {
+                messages = [text]
+            }
+        }
+    }
+
     var status: Int?
     var description: String?
+    var errors: [ErrorGroup]?
+
+    /// The human-readable sentence(s), whichever shape arrived.
+    var message: String? {
+        let nested = (errors ?? []).flatMap(\.messages).filter { !$0.isEmpty }
+        if !nested.isEmpty { return nested.joined(separator: " ") }
+        return description
+    }
 }
 
 public enum APIError: LocalizedError, Equatable {
