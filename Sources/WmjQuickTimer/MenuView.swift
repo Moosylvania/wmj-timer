@@ -16,6 +16,7 @@ struct MenuView: View {
         if model.isConfigured {
             Button(timerLabel) { open(WindowID.timer) }
             Button("Quick Log") { open(WindowID.quickLog) }
+            Button("View Today's Time") { open(WindowID.today) }
         } else {
             Button("Set Up Workamajig…") { showSettings() }
         }

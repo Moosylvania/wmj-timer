@@ -200,6 +200,45 @@ public extension [TimesheetEntry] {
     }
 }
 
+/// One display row of today's logged time: timesheet entries resolved to
+/// human-readable names (`GET /time` returns only numbers/codes).
+public struct TodayRow: Identifiable, Sendable, Equatable {
+    public var id: String
+    public var projectName: String
+    public var taskName: String
+    public var serviceName: String
+    public var hours: Double
+
+    /// Joins entries against the already-loaded projects/services and the
+    /// per-project task lists. Every lookup falls back to the raw value, and
+    /// 0-hour rows (the app's own pre-start validation entries) are hidden.
+    public static func build(entries: [TimesheetEntry], projects: [Project],
+                             services: [Service], tasksByProject: [String: [WMJTask]]) -> [TodayRow] {
+        entries.filter { $0.actualHours != 0 }.map { entry in
+            let project = projects.first { $0.projectNumber == entry.projectNumber }
+            let service = services.first {
+                $0.serviceCode.caseInsensitiveCompare(entry.serviceCode) == .orderedSame
+            }
+            let task = entry.projectKey.flatMap { key in
+                tasksByProject[key]?.first { $0.taskID == entry.taskID }
+            }
+            return TodayRow(id: entry.timeKey,
+                            projectName: project?.projectName ?? entry.projectNumber,
+                            taskName: task?.taskName ?? entry.taskID,
+                            serviceName: service?.description ?? entry.serviceCode,
+                            hours: entry.actualHours)
+        }
+    }
+
+    public init(id: String, projectName: String, taskName: String, serviceName: String, hours: Double) {
+        self.id = id
+        self.projectName = projectName
+        self.taskName = taskName
+        self.serviceName = serviceName
+        self.hours = hours
+    }
+}
+
 // MARK: - Response envelopes
 
 struct Envelope<Payload: Decodable>: Decodable {

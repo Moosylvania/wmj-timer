@@ -54,6 +54,7 @@ final class AppModel {
     }
     var projects: [Project] = []
     var services: [Service] = []
+    var todayRows: [TodayRow] = []
     var loadError: String?
     /// Projects on the user's recent timesheets, most recent first — used only
     /// to rank the search list (membership can't be queried; see AGENTS.md).
@@ -267,6 +268,33 @@ final class AppModel {
         }
     }
 
+    /// Today's timesheet entries resolved to names for the Today panel.
+    /// Needs `refresh()` to have populated projects/services first.
+    func loadToday() async {
+        if Self.demo {
+            todayRows = TodayRow.build(entries: Self.demoTodayEntries, projects: Self.demoProjects,
+                                       services: Self.demoServices, tasksByProject: ["d1": Self.demoTasks])
+            return
+        }
+        guard isConfigured else { return }
+        do {
+            let entries = try await api.timeEntries(on: Date())
+            var tasksByProject: [String: [WMJTask]] = [:]
+            // A day's timesheet has single-digit distinct projects — far under
+            // the ~55-request 429 ceiling. A failed lookup just shows raw taskIDs.
+            for key in Set(entries.compactMap(\.projectKey)) {
+                tasksByProject[key] = (try? await api.tasks(projectKey: key)) ?? []
+            }
+            todayRows = TodayRow.build(entries: entries, projects: projects,
+                                       services: services, tasksByProject: tasksByProject)
+            loadError = nil
+        } catch is CancellationError {
+        } catch let error as URLError where error.code == .cancelled {
+        } catch {
+            loadError = error.localizedDescription
+        }
+    }
+
     /// Tasks for a project the user can plausibly log time to: not completed,
     /// and assigned to them or unassigned. The API has no real "can log time"
     /// check short of POSTing an entry, so this is the best available gate.
@@ -355,6 +383,19 @@ extension AppModel {
         assets: [.init(name: "Wmj-Quick-Timer-0.3.0.zip",
                        browserDownloadURL: URL(string: "https://example.invalid/demo.zip")!,
                        size: 664_789)])
+
+    /// Today panel rows: two resolve against `demoTasks`, one exercises the
+    /// raw-taskID fallback (nil projectKey), and the 0-hour row must be hidden.
+    static let demoTodayEntries = [
+        TimesheetEntry(timeKey: "e1", actualHours: 1.5, projectNumber: "ACME-1042",
+                       taskID: "30", serviceCode: "dev", workDate: "2026-08-05T00:00:00", projectKey: "d1"),
+        TimesheetEntry(timeKey: "e2", actualHours: 0.75, projectNumber: "ACME-1042",
+                       taskID: "50", serviceCode: "crtv", workDate: "2026-08-05T00:00:00", projectKey: "d1"),
+        TimesheetEntry(timeKey: "e3", actualHours: 2, projectNumber: "NORTH-2201",
+                       taskID: "2.1.1", serviceCode: "strat", workDate: "2026-08-05T00:00:00"),
+        TimesheetEntry(timeKey: "e4", actualHours: 0, projectNumber: "GLOBEX-3310",
+                       taskID: "10", serviceCode: "am", workDate: "2026-08-05T00:00:00", projectKey: "d4"),
+    ]
 
     static let demoServices = [
         Service(serviceCode: "CRTV", description: "Creative"),

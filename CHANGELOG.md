@@ -5,6 +5,12 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
+## [0.3.2] - 2026-08-05
+
+### Added
+
+- **View Today's Time** in the menu: a window listing what's already on today's timesheet (project, task, service, hours), with a **View Full Timesheet** link that opens your Workamajig site in the browser.
+
 ## [0.3.1] - 2026-08-04
 
 ### Added

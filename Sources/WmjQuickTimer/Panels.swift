@@ -5,6 +5,7 @@ enum WindowID {
     static let timer = "timer"
     static let quickLog = "quickLog"
     static let update = "update"
+    static let today = "today"
 }
 
 /// Update window: what's new, and a button that downloads, verifies and
@@ -199,6 +200,61 @@ struct QuickLogPanel: View {
     }
 }
 
+/// Today panel: what's already on today's timesheet, resolved to names, with a
+/// link out to the full Workamajig timesheet.
+struct TodayPanel: View {
+    @Environment(AppModel.self) private var model
+    @State private var loading = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Today's Time").font(.headline)
+            if loading && model.todayRows.isEmpty {
+                ProgressView().controlSize(.small)
+            } else if model.todayRows.isEmpty {
+                Text("No time logged today.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            } else {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                    GridRow {
+                        Text("Project")
+                        Text("Task")
+                        Text("Service")
+                        Text("Hours").gridColumnAlignment(.trailing)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    Divider()
+                    ForEach(model.todayRows) { row in
+                        GridRow {
+                            Text(row.projectName)
+                            Text(row.taskName)
+                            Text(row.serviceName)
+                            Text(row.hours, format: .number.precision(.fractionLength(2)))
+                                .monospacedDigit()
+                        }
+                        .font(.callout)
+                    }
+                }
+            }
+            if let url = URL(string: model.wmjURL), !model.wmjURL.isEmpty {
+                Link("View Full Timesheet", destination: url)
+            }
+            if let message = model.loadError {
+                Text(message).font(.caption).foregroundStyle(.red)
+            }
+        }
+        .panelChrome(width: 520)
+        .task {
+            // refresh first: the name joins need projects/services loaded.
+            await model.refresh()
+            await model.loadToday()
+            loading = false
+        }
+    }
+}
+
 /// Drops the containing window under the menu bar icon instead of wherever
 /// SwiftUI last left it.
 private struct StatusItemAnchor: NSViewRepresentable {
@@ -225,9 +281,9 @@ private struct StatusItemAnchor: NSViewRepresentable {
 }
 
 extension View {
-    func panelChrome() -> some View {
+    func panelChrome(width: CGFloat = 380) -> some View {
         padding(16)
-            .frame(width: 380)
+            .frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
             .background(StatusItemAnchor())
             .regularWhileOpen()

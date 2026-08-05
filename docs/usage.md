@@ -6,6 +6,7 @@ Click the timer icon in the menu bar for a short menu:
 
 - **Add Timer** (or **Timer — X:XX** while one is running) — opens the timer window
 - **Quick Log** — opens the quick log window
+- **View Today's Time** — shows what's already on today's timesheet
 - **Settings…** and **Quit**
 
 Each action opens its own small window that stays put while you work in other apps. Both are always available — you can quick-log hours while a timer is running.
@@ -45,6 +46,12 @@ Notes:
 
 - Only **one timer** can run at a time.
 - The timer keeps counting while your Mac sleeps, and **survives quitting or restarting the app** — it's based on wall-clock time, not a running counter.
+
+## View Today's Time
+
+![The Timer window while running](images/todays-time.png)
+
+A quick read-only check of what you've already logged today: a table of project, task, service, and hours for each entry on today's timesheet. (The 0-hour placeholder entries the timer's pre-start check creates are hidden.) **View Full Timesheet** at the bottom opens your Workamajig site in the browser.
 
 ## Settings
 
