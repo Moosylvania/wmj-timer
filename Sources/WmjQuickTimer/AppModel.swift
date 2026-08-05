@@ -218,14 +218,15 @@ final class AppModel {
         guard Bundle.main.bundleIdentifier != nil,   // UNUserNotificationCenter traps unbundled
               UserDefaults.standard.string(forKey: "notifiedVersion") != release.version else { return }
         UserDefaults.standard.set(release.version, forKey: "notifiedVersion")
-        let content = UNMutableNotificationContent()
-        content.title = "Wmj Quick Timer \(release.version) is available"
-        content.body = "You have \(Self.currentVersion). Choose “Update…” from the menu bar to install it."
-        let request = UNNotificationRequest(identifier: "update-\(release.version)",
-                                            content: content, trigger: nil)
-        let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert]) { granted, _ in
-            if granted { center.add(request) }
+        let version = release.version
+        Task {
+            let center = UNUserNotificationCenter.current()
+            guard (try? await center.requestAuthorization(options: [.alert])) == true else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "Wmj Quick Timer \(version) is available"
+            content.body = "You have \(Self.currentVersion). Choose “Update…” from the menu bar to install it."
+            try? await center.add(UNNotificationRequest(identifier: "update-\(version)",
+                                                        content: content, trigger: nil))
         }
     }
 

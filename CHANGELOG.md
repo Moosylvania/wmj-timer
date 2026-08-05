@@ -5,6 +5,12 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
+## [0.3.3] - 2026-08-05
+
+### Fixed
+
+- The new-version notification is now requested and delivered through the async notification APIs, resolving Swift strict-concurrency warnings about non-Sendable captures in the authorization callback. No behavior change.
+
 ## [0.3.2] - 2026-08-05
 
 ### Added
