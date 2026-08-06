@@ -55,6 +55,8 @@ final class AppModel {
     var projects: [Project] = []
     var services: [Service] = []
     var todayRows: [TodayRow] = []
+    /// Calendar day `todayRows` was last fetched on, so day rollover can invalidate it.
+    @ObservationIgnored private var todayFetched: Date?
     var loadError: String?
     /// Projects on the user's recent timesheets, most recent first — used only
     /// to rank the search list (membership can't be queried; see AGENTS.md).
@@ -278,6 +280,11 @@ final class AppModel {
             return
         }
         guard isConfigured else { return }
+        // Rows fetched on a previous calendar day aren't "today" anymore —
+        // drop them so the panel shows a loading state instead of stale data.
+        if let fetched = todayFetched, !Calendar.current.isDateInToday(fetched) {
+            todayRows = []
+        }
         do {
             let entries = try await api.timeEntries(on: Date())
             var tasksByProject: [String: [WMJTask]] = [:]
@@ -288,6 +295,7 @@ final class AppModel {
             }
             todayRows = TodayRow.build(entries: entries, projects: projects,
                                        services: services, tasksByProject: tasksByProject)
+            todayFetched = Date()
             loadError = nil
         } catch is CancellationError {
         } catch let error as URLError where error.code == .cancelled {

@@ -53,6 +53,8 @@ Notes:
 
 A quick read-only check of what you've already logged today: a table of project, task, service, and hours for each entry on today's timesheet. (The 0-hour placeholder entries the timer's pre-start check creates are hidden.) **View Full Timesheet** at the bottom opens your Workamajig site in the browser.
 
+The table refreshes each time the window opens — a **Syncing…** indicator next to the title shows while the latest entries load. A window left open past midnight automatically reloads for the new day.
+
 ## Settings
 
 ![The Settings window](images/settings.png)

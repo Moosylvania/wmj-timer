@@ -5,6 +5,14 @@ Every released version of Wmj Quick Timer and what changed in it. Format follows
 [Semantic Versioning](https://semver.org). Downloads are on the
 [Releases page](https://github.com/Moosylvania/wmj-timer/releases).
 
+## [0.3.4] - 2026-08-06
+
+### Fixed
+
+- An empty timesheet no longer shows a red "Your search returned no results" error in the Today's Time window — the API's 400 on an empty date range is now treated as "no time logged", not a failure.
+- The Today's Time window now refetches when the calendar day changes, so a window (or app) left open overnight shows the new day's timesheet instead of yesterday's.
+- Reopening Today's Time after logging time now shows a "Syncing…" indicator next to the title while fresh data loads, instead of silently displaying the previous rows.
+
 ## [0.3.3] - 2026-08-05
 
 ### Fixed

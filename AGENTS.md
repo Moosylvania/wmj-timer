@@ -99,7 +99,7 @@ Base `{wmjURL}/api/beta1`, headers `APIAccessToken` (company) + `UserToken` (use
 | `GET /tasks?projectKey=&includeTaskUser=true` | **camelCase**; `taskID` is usually a number but can be any string ("2.1.1" on outline-numbered jobs) — decoded to and posted as a string. Also returns `percComp`, `completedByDate` ("1/1/1900 …" = never), and `taskUser` (assignments with `userKey`/`userName`/`serviceCode`). `taskStatus` (1/2/3) is a **schedule** indicator (3 = late), NOT open/closed — filter completion on `percComp`/`completedByDate` |
 | `GET /services` | PascalCase (`ServiceCode`, `Description`) |
 | `POST /time` | Body is a JSON **array** of entries; success is `{"success":[…]}`; `workDate` is `M/d/yyyy` with `en_US_POSIX` |
-| `GET /time?startDate=&endDate=&includeTime=1` | Timesheets (UserToken-scoped) with `TimeEntries` inside; entry `taskID` is a **string** here and `serviceCode` comes back lowercased |
+| `GET /time?startDate=&endDate=&includeTime=1` | Timesheets (UserToken-scoped) with `TimeEntries` inside; entry `taskID` is a **string** here and `serviceCode` comes back lowercased. An empty range is a **400** ("Your search returned no results…"), not an empty list — `timesheetEntries` maps it to `[]` |
 | `PUT /time` | Update an entry: array body `[{"timeKey":…,"hours":…}]` suffices; same success envelope. Used by merge-on-submit (`AppModel.submitTime`) |
 
 Field casing is inconsistent per module — every model spells out `CodingKeys`. Verify against `scripts/smoke.sh` output before trusting a new model.

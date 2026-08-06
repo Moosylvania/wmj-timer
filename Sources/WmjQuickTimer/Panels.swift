@@ -208,14 +208,18 @@ struct TodayPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Today's Time").font(.headline)
-            if loading && model.todayRows.isEmpty {
-                ProgressView().controlSize(.small)
-            } else if model.todayRows.isEmpty {
+            HStack(spacing: 6) {
+                Text("Today's Time").font(.headline)
+                if loading {
+                    ProgressView().controlSize(.mini)
+                    Text("Syncing…").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            if model.todayRows.isEmpty && !loading {
                 Text("No time logged today.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
-            } else {
+            } else if !loading {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
                     GridRow {
                         Text("Project")
@@ -247,10 +251,21 @@ struct TodayPanel: View {
         }
         .panelChrome(width: 520)
         .task {
+            // Reset explicitly: the window is hidden, not destroyed, on close,
+            // so @State survives and `loading` is false on every reopen.
+            loading = true
             // refresh first: the name joins need projects/services loaded.
             await model.refresh()
             await model.loadToday()
             loading = false
+        }
+        // Panel left open past midnight: refetch for the new day.
+        .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+            Task {
+                loading = true
+                await model.loadToday()
+                loading = false
+            }
         }
     }
 }

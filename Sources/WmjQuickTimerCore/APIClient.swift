@@ -80,12 +80,20 @@ public final class APIClient: Sendable {
     }
 
     private func timesheetEntries(start: Date, end: Date) async throws -> [TimesheetEntry] {
-        let list: Envelope<TimesheetList> = try await get("time", query: [
-            .init(name: "startDate", value: TimeEntry.apiDateString(start)),
-            .init(name: "endDate", value: TimeEntry.apiDateString(end)),
-            .init(name: "includeTime", value: "1"),
-        ])
-        return list.data.timesheet.flatMap { $0.timeEntries ?? [] }
+        do {
+            let list: Envelope<TimesheetList> = try await get("time", query: [
+                .init(name: "startDate", value: TimeEntry.apiDateString(start)),
+                .init(name: "endDate", value: TimeEntry.apiDateString(end)),
+                .init(name: "includeTime", value: "1"),
+            ])
+            return list.data.timesheet.flatMap { $0.timeEntries ?? [] }
+        } catch let APIError.http(status: 400, description: description)
+            where description.localizedCaseInsensitiveContains("no results") {
+            // The API 400s on an empty range ("Your search returned no
+            // results. Please try again.") — that's an empty timesheet, not
+            // an error.
+            return []
+        }
     }
 
     /// Replaces an existing entry's hours (merge-on-submit computes the new total).
